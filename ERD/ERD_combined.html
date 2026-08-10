@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telehealth Platform — ERD</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f8f9fa;
+    }
+    h1 {
+      text-align: center;
+      color: #222;
+      margin-bottom: 8px;
+      font-size: 22px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #666;
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+    #erd {
+      width: 100%;
+      overflow-x: auto;
+      padding: 16px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    #erd svg.erDiagram {
+      width: 100%;
+      min-width: 1400px;
+      height: auto;
+      overflow: visible;
+    }
+    #erd svg.erDiagram text,
+    #erd svg.erDiagram tspan,
+    #erd svg.erDiagram .label,
+    #erd svg.erDiagram .entityLabel,
+    #erd svg.erDiagram .relationshipLabel {
+      font-family: Arial, Helvetica, sans-serif !important;
+      fill: #111111 !important;
+      color: #111111 !important;
+    }
+    #erd svg.erDiagram .entityLabel {
+      font-size: 16px !important;
+      font-weight: 700 !important;
+    }
+    #erd svg.erDiagram .relationshipLabel {
+      font-size: 13px !important;
+      font-weight: 600 !important;
+    }
+    #erd svg.erDiagram .divider path,
+    #erd svg.erDiagram .relationshipLine {
+      stroke: #222222 !important;
+      stroke-opacity: 1 !important;
+      stroke-width: 2px !important;
+    }
+    #erd svg.erDiagram .node rect,
+    #erd svg.erDiagram .node path {
+      stroke: #222222 !important;
+      stroke-width: 1.5px !important;
+    }
+    #erd svg.erDiagram .row-rect-odd path,
+    #erd svg.erDiagram .row-rect-even path {
+      stroke: #d0d0d0 !important;
+      stroke-width: 1px !important;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: #1a1a1a; }
+      h1 { color: #eee; }
+      .subtitle { color: #aaa; }
+      #erd { background: #2a2a2a; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+      #erd svg.erDiagram text,
+      #erd svg.erDiagram tspan,
+      #erd svg.erDiagram .label,
+      #erd svg.erDiagram .entityLabel,
+      #erd svg.erDiagram .relationshipLabel {
+        fill: #111111 !important;
+        color: #111111 !important;
+      }
+      #erd svg.erDiagram .divider path,
+      #erd svg.erDiagram .relationshipLine,
+      #erd svg.erDiagram .node rect,
+      #erd svg.erDiagram .node path {
+        stroke: #222222 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Telehealth Platform — Entity Relationship Diagram</h1>
+  <div class="subtitle">v1 — Core entities + Supporting entities</div>
+
+  <div id="erd"></div>
+
+  <script type="module">
+    import mermaid from "https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs";
+    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    await document.fonts.ready;
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: "base",
+      fontFamily: '"anthropic-sans", Arial, sans-serif',
+      themeVariables: {
+        darkMode: dark,
+        fontSize: "13px",
+        fontFamily: '"anthropic-sans", Arial, sans-serif',
+        lineColor: dark ? "#9c9a92" : "#73726c",
+        textColor: dark ? "#c2c0b6" : "#3d3d3a",
+      },
+    });
+
+    const diagram = `erDiagram
+      %% Core entities
+      USERS ||--o| CONSULTANT_PROFILES : "has (if consultant)"
+      USERS ||--o| PATIENT_PROFILES : "has (if patient)"
+      CONSULTANT_PROFILES ||--o{ AVAILABILITY_SLOTS : defines
+      CONSULTANT_PROFILES ||--o{ APPOINTMENTS : accepts
+      PATIENT_PROFILES ||--o{ APPOINTMENTS : books
+      APPOINTMENTS ||--o| CONSULTATIONS : produces
+
+      %% Supporting entities
+      APPOINTMENTS ||--o| PAYMENTS : "paid via"
+      APPOINTMENTS ||--o{ CHAT_MESSAGES : contains
+      USERS ||--o{ CHAT_MESSAGES : sends
+      CONSULTATIONS ||--o| AI_SUMMARIES : generates
+      CONSULTATIONS ||--o| AI_JOBS : "processed by"
+      USERS ||--o{ NOTIFICATIONS : receives
+      USERS ||--o{ REFRESH_TOKENS : has
+
+      USERS {
+        guid Id PK
+        string Email
+        string PasswordHash
+        string Role
+        datetime CreatedAt
+      }
+      CONSULTANT_PROFILES {
+        guid Id PK
+        guid UserId FK
+        string Specialty
+        string Bio
+        string TimeZoneId
+        bool IsVerified
+        string ProfileImageUrl
+      }
+      PATIENT_PROFILES {
+        guid Id PK
+        guid UserId FK
+        string HealthInfo
+        string ContactDetails
+      }
+      AVAILABILITY_SLOTS {
+        guid Id PK
+        guid ConsultantId FK
+        int DayOfWeek
+        time StartTimeUtc
+        time EndTimeUtc
+      }
+      APPOINTMENTS {
+        guid Id PK
+        guid PatientId FK
+        guid ConsultantId FK
+        datetime ScheduledStartUtc
+        string Status
+        string CancellationReason
+        datetime CancelledAt
+      }
+      CONSULTATIONS {
+        guid Id PK
+        guid AppointmentId FK
+        datetime StartedAt
+        datetime EndedAt
+        int DurationMinutes
+        string Status
+      }
+      PAYMENTS {
+        guid Id PK
+        guid AppointmentId FK
+        decimal Amount
+        string Currency
+        string StripePaymentIntentId
+        string StripeClientSecret
+        string IdempotencyKey
+        string Status
+        datetime CreatedAt
+        datetime PaidAt
+      }
+      CHAT_MESSAGES {
+        guid Id PK
+        guid AppointmentId FK
+        guid SenderId FK
+        string Content
+        string MessageType
+        datetime SentAt
+        datetime ReadAt
+      }
+      AI_SUMMARIES {
+        guid Id PK
+        guid ConsultationId FK
+        string ChiefComplaint
+        json StructuredOutput
+        datetime CreatedAt
+      }
+      AI_JOBS {
+        guid Id PK
+        guid ConsultationId FK
+        string Status
+        datetime ProcessingStartedAt
+        int RetryCount
+        string Provider
+        string PromptVersion
+        string ErrorDetails
+        datetime CreatedAt
+      }
+      NOTIFICATIONS {
+        guid Id PK
+        guid UserId FK
+        string Type
+        json Data
+        bool IsRead
+        datetime ReadAt
+        datetime CreatedAt
+      }
+      REFRESH_TOKENS {
+        guid Id PK
+        guid UserId FK
+        string TokenHash
+        datetime ExpiresAt
+        datetime CreatedAt
+        datetime RevokedAt
+      }`;
+
+    const { svg } = await mermaid.render("erd-svg", diagram);
+    document.getElementById("erd").innerHTML = svg;
+
+    document.querySelectorAll("#erd svg.erDiagram .node").forEach((node) => {
+      const firstPath = node.querySelector("path[d]");
+      if (!firstPath) return;
+      const d = firstPath.getAttribute("d");
+      const nums = d.match(/-?[\d.]+/g)?.map(Number);
+      if (!nums || nums.length < 8) return;
+      const xs = [nums[0], nums[2], nums[4], nums[6]];
+      const ys = [nums[1], nums[3], nums[5], nums[7]];
+      const x = Math.min(...xs), y = Math.min(...ys);
+      const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", x);
+      rect.setAttribute("y", y);
+      rect.setAttribute("width", w);
+      rect.setAttribute("height", h);
+      rect.setAttribute("rx", "8");
+      for (const a of ["fill", "stroke", "stroke-width", "class", "style"]) {
+        if (firstPath.hasAttribute(a))
+          rect.setAttribute(a, firstPath.getAttribute(a));
+      }
+      firstPath.replaceWith(rect);
+    });
+
+    document
+      .querySelectorAll(
+        "#erd svg.erDiagram .row-rect-odd path, #erd svg.erDiagram .row-rect-even path",
+      )
+      .forEach((p) => {
+        p.setAttribute("stroke", "none");
+      });
+  </script>
+</body>
+</html>
