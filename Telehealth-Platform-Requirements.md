@@ -14,29 +14,32 @@ A full-stack Telehealth platform that connects patients with medical consultants
 
 ## 2. Actors
 
-| Actor | Description |
-|---|---|
-| **Patient** | Searches for consultants, books appointments, pays for consultations, chats/video calls with the doctor, receives AI-assisted suggestions. |
-| **Consultant (Doctor)** | Manages availability, accepts/handles bookings, communicates with patients, receives consultation summaries. Must be verified before appearing in patient search. |
-| **Admin** *(deferred to v2)* | Oversees platform operations — not part of v1, though a minimal manual verification path exists (see 3.1). |
+| Actor                        | Description                                                                                                                                                       |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Patient**                  | Searches for consultants, books appointments, pays for consultations, chats/video calls with the doctor, receives AI-assisted suggestions.                        |
+| **Consultant (Doctor)**      | Manages availability, accepts/handles bookings, communicates with patients, receives consultation summaries. Must be verified before appearing in patient search. |
+| **Admin** _(deferred to v2)_ | Oversees platform operations — not part of v1, though a minimal manual verification path exists (see 3.1).                                                        |
 
 ---
 
 ## 3. Functional Requirements (User Stories)
 
 ### 3.1 Authentication & Profiles
+
 - As a Patient/Consultant, I want to register and log in securely, so that I can access the platform.
 - As a Patient, I want to create and edit my profile (basic health info, contact details), so that consultants have context.
 - As a Consultant, I want to create a professional profile (specialty, bio, credentials, timezone), so that patients can evaluate me.
 - As a system, I want role-based authorization (Patient vs Consultant), so that each actor only accesses relevant endpoints.
 - As a system, I want to verify resource ownership on every request (not just authentication), so that Patient A can never access Patient B's data, and Consultant A can never access Consultant B's consultations.
-- As a system, I want a `ConsultantProfile.IsVerified` flag (default `false`), so that unverified consultants can complete their profile but do not appear in patient search until verified. *(v1: verification can be a manual DB update; no admin UI needed yet — the flag and the rule are what matter.)*
+- As a system, I want a `ConsultantProfile.IsVerified` flag (default `false`), so that unverified consultants can complete their profile but do not appear in patient search until verified. _(v1: verification can be a manual DB update; no admin UI needed yet — the flag and the rule are what matter.)_
 
-> **⚠️ Mutual exclusivity — a `User` must be a Patient XOR a Consultant, never both:** The ERD models `Users`→`ConsultantProfiles` and `Users`→`PatientProfiles` as two separate optional one-to-one relationships. That correctly stops a user from having *two* Consultant Profiles, but nothing in the relationship itself stops a user from having *both* a Consultant Profile *and* a Patient Profile — most RDBMS (including SQL Server) don't support a plain CHECK constraint spanning two different tables.
+> **⚠️ Mutual exclusivity — a `User` must be a Patient XOR a Consultant, never both:** The ERD models `Users`→`ConsultantProfiles` and `Users`→`PatientProfiles` as two separate optional one-to-one relationships. That correctly stops a user from having _two_ Consultant Profiles, but nothing in the relationship itself stops a user from having _both_ a Consultant Profile _and_ a Patient Profile — most RDBMS (including SQL Server) don't support a plain CHECK constraint spanning two different tables.
+>
 > - **Primary enforcement (application layer):** `Users.Role` is set once at registration and treated as **immutable**. The `CreateConsultantProfile` command handler rejects the request unless `User.Role == Consultant`; `CreatePatientProfile` mirrors this for `Role == Patient`. As long as `Role` never changes after registration, this alone guarantees exclusivity.
 > - **Optional defense-in-depth (DB layer):** A database trigger on insert into either profile table that verifies no row exists for the same `UserId` in the other table — a safety net against an application-layer bug, useful as a learning exercise even if not strictly required for v1.
 
 ### 3.2 Scheduling & Booking
+
 - As a Consultant, I want to set my weekly availability (recurring time windows, e.g. Mon 09:00–13:00, **in my own timezone**), so that patients can only book free slots.
 - As a system, I want to compute actual bookable slots as `Weekly Availability − Existing Appointments`, so that double-booking is impossible.
 - As a system, I want a fixed appointment duration in v1 (**30 minutes**), so that slot calculation stays simple.
@@ -58,26 +61,31 @@ Confirmed      → NoShow
 ```
 
 > **⚠️ Decide during ERD design:** `Paid` may not need to be its own `AppointmentStatus` — `Payment.Status` (Section 3.3) already tracks payment state separately. Having "paid" represented in two places risks the two getting out of sync (e.g. `Payment.Status = Paid` but `Appointment.Status` still `PendingPayment`). Consider collapsing to:
+>
 > ```
 > PendingPayment → Confirmed → InProgress → Completed
 > ```
+>
 > where the transition to `Confirmed` is triggered directly by the Stripe webhook confirming `Payment.Status = Paid`, keeping `Payment` as the single source of truth for payment state. Finalize this when designing the ERD, not before.
 
 > **⚠️ Concurrency — booking race condition:** "Weekly Availability − Existing Appointments" alone is not enough to prevent double-booking if two patients book the same slot simultaneously. Enforce this at the **database level**, not just in application logic. Two viable approaches:
+>
 > - **Option A (simpler):** A unique constraint on `(ConsultantId, StartTime, Status)` in the `Appointments` table (excluding `Cancelled` rows), so a duplicate insert fails at the DB level.
 > - **Option B:** Optimistic concurrency via `RowVersion`, or `WITH (UPDLOCK, HOLDLOCK)` when checking availability and creating the appointment inside the same transaction.
-> Decide and document the chosen approach during ERD/transaction design — this is a v1 requirement, not a nice-to-have.
+>   Decide and document the chosen approach during ERD/transaction design — this is a v1 requirement, not a nice-to-have.
 
 - As a system, I want to prevent a Patient from having overlapping active/upcoming appointments — even across different consultants — so that a patient can't double-book themselves into two consultations at once.
 
-> **⚠️ Patient-side overlap rule (distinct from the consultant race condition above):** The consultant-side constraint stops two *patients* from booking the same *consultant* slot. This is different — it stops the *same patient* from booking two *different consultants* at overlapping times. Since v1 fixes appointment duration to 30 minutes **and** availability slots are quantized to a fixed 30-minute grid (not offset per consultant), two overlapping appointments for the same patient will always share the exact same `ScheduledStartUtc`. That simplifies enforcement to:
+> **⚠️ Patient-side overlap rule (distinct from the consultant race condition above):** The consultant-side constraint stops two _patients_ from booking the same _consultant_ slot. This is different — it stops the _same patient_ from booking two _different consultants_ at overlapping times. Since v1 fixes appointment duration to 30 minutes **and** availability slots are quantized to a fixed 30-minute grid (not offset per consultant), two overlapping appointments for the same patient will always share the exact same `ScheduledStartUtc`. That simplifies enforcement to:
+>
 > - A unique constraint on `(PatientId, ScheduledStartUtc)` in `Appointments`, filtered to active statuses (excluding `Cancelled`/`NoShow`/`PaymentFailed`) — same pattern as the consultant-side constraint, just on the other foreign key.
 > - This check must happen inside the same transaction/lock as the consultant-side availability check (Option A/B above), not as a separate query — otherwise a race between the two checks reopens the same problem.
-> If a future version supports variable appointment durations, this simplification breaks and a true time-range overlap check (`NewStart < ExistingEnd AND NewEnd > ExistingStart`) is required instead — note this as a v2 migration risk if durations become variable.
+>   If a future version supports variable appointment durations, this simplification breaks and a true time-range overlap check (`NewStart < ExistingEnd AND NewEnd > ExistingStart`) is required instead — note this as a v2 migration risk if durations become variable.
 
 > **⚠️ Timezone handling:** Availability set by a Cairo-based consultant and viewed by a Saudi-based patient must resolve correctly. Rule: **store all availability and appointment times in UTC**; `ConsultantProfile` carries a `TimeZoneId` (e.g. `"Africa/Cairo"`); the backend always returns UTC; the Flutter app converts to the device's local time for display. Add `TimeZoneId` to `ConsultantProfile` from v1 — retrofitting this later is painful.
 
 ### 3.3 Payments
+
 - As a Patient, I want to pay for a consultation via Stripe at booking time, so that the appointment is confirmed only after payment.
 - As a system, I want to create a Stripe PaymentIntent when a booking starts, so that payment can be tracked end-to-end.
 - As a system, I want to verify payment success **only via Stripe Webhooks** (never trust the Flutter client's claim that payment succeeded), so that appointment status updates reliably and securely.
@@ -85,15 +93,18 @@ Confirmed      → NoShow
 - As a Consultant, I want to see my earnings/payout summary, so that I can track income.
 
 **Payment flow — ordering matters (Stripe calls should not sit inside a DB transaction, since the API call can be slow and would hold a connection/lock):**
+
 ```
 1. Create Appointment (Status = PendingPayment) in DB — atomic with any related writes
 2. Call Stripe to create PaymentIntent (with Idempotency-Key)
 3. Update Appointment/Payment with the returned PaymentIntentId + ClientSecret
 4. Stripe → Webhook → ASP.NET Core → Mark Payment = Paid → Appointment = Confirmed
 ```
+
 If step 2 fails after step 1 succeeds, the Appointment stays `PendingPayment` and can be retried or expired by a cleanup job — avoids orphaned payments without needing a distributed transaction.
 
 **Payment entity (draft):**
+
 ```
 Payment
 - Id
@@ -109,6 +120,7 @@ Payment
 ```
 
 ### 3.4 Real-time Chat & Video (WebRTC)
+
 - As a Patient/Consultant, I want to exchange real-time messages before/during a consultation, so that we can communicate asynchronously.
 - As a system, I want chat messages persisted to the database (not just delivered live), so that conversation history survives reconnects and is available later.
 - As a system, I want chat message content encrypted at rest (application-layer encryption or SQL Server column-level encryption on `ChatMessage.Content`), so that patient health-related conversations aren't stored in plaintext.
@@ -116,9 +128,10 @@ Payment
 - As a system, I want to use SignalR **only** as the signaling layer for WebRTC (exchanging Offer/Answer/ICE Candidates/Call Events) — SignalR is not the media transport; actual audio/video flows over WebRTC peer connections.
 - As a system, I want to use a STUN server for NAT traversal, and fall back to a TURN server when a direct peer connection fails, so that calls succeed across different network conditions.
 
-> **⚠️ Chat authorization rule (not visible from the FK alone):** `ChatMessage.SenderId → Users.Id` only says *a* valid user sent the message — it does not say that user was allowed to send it *in that appointment*. The `SenderId` FK must be checked against `Appointment.PatientId`/`Appointment.ConsultantId`: **the sender must be one of the two participants of that appointment.** This is the same resource-ownership principle from Section 3.1 applied to chat specifically — enforce it in the SignalR Hub method / command handler before persisting a message, not just at the database schema level (a plain FK constraint can't express "must be one of these two specific users").
+> **⚠️ Chat authorization rule (not visible from the FK alone):** `ChatMessage.SenderId → Users.Id` only says _a_ valid user sent the message — it does not say that user was allowed to send it _in that appointment_. The `SenderId` FK must be checked against `Appointment.PatientId`/`Appointment.ConsultantId`: **the sender must be one of the two participants of that appointment.** This is the same resource-ownership principle from Section 3.1 applied to chat specifically — enforce it in the SignalR Hub method / command handler before persisting a message, not just at the database schema level (a plain FK constraint can't express "must be one of these two specific users").
 
 **Chat message entity (draft):**
+
 ```
 ChatMessage
 - Id
@@ -156,6 +169,7 @@ User ──API──► AI Use Cases ──► IAIService (abstraction) ──�
 ```
 
 `IAIService` example (conceptual):
+
 ```csharp
 public interface IAIService
 {
@@ -196,9 +210,10 @@ Notify Consultant
 ```
 
 > **⚠️ Background job reliability:** If the server restarts mid-job, an in-memory-only `BackgroundService` loses track of it. Persist job state so it can recover:
+>
 > - `AIJob.Status` transitions to `Processing` with `ProcessingStartedAt` set when work begins.
 > - On startup (or on a polling interval), the service picks up jobs where `Status = Pending`, **or** `Status = Processing AND ProcessingStartedAt < Now.AddMinutes(-10)` (stuck jobs get retried).
-> This makes the pipeline self-healing across restarts without needing a message queue in v1.
+>   This makes the pipeline self-healing across restarts without needing a message queue in v1.
 
 > **⚠️ Cardinality decision — retry vs. versioning:** `AIJob` retries (via `RetryCount`) reuse the same row and never persist an `AISummary` until one attempt succeeds — this is why `Consultation → AISummary` stays a `0..1` relationship in v1 (see Section 8 for the full rationale). If future prompt/provider experimentation needs a kept history of multiple summaries per consultation, that's a `0..*` relationship change, not something this pipeline needs to support today.
 
@@ -229,12 +244,13 @@ The **architecture** supports both chat-based and voice-based context from day o
 - **v1:** Chat-based consultation summary, AI provider abstraction, structured output, retry/timeout/failure handling.
 - **v2:** Speech-to-Text integration, voice transcript, transcript + chat combined summary.
 
-### 3.6 Notifications *(in v1 scope, in-app only)*
+### 3.6 Notifications _(in v1 scope, in-app only)_
+
 - As a Patient/Consultant, I want to receive in-app notifications for key events, so that I stay informed without checking manually.
 - Events to cover in v1: Appointment booked, Appointment confirmed, Appointment cancelled, Appointment starting soon, Doctor joined consultation.
 - As a system, I want to deliver in-app notifications via SignalR, so that no extra infrastructure is needed for v1.
 - As a Patient/Consultant, I want to see which notifications are unread, so that I can tell what's new.
-- *(Push notifications via FCM remain out of scope for v1 — see Section 7.)*
+- _(Push notifications via FCM remain out of scope for v1 — see Section 7.)_
 
 ---
 
@@ -254,7 +270,7 @@ Appointment (1:1) Consultation
                      └── Summary
 ```
 
-This separation keeps WebRTC session data, chat history, and AI summaries cleanly attached to the *session*, distinct from the *booking* record.
+This separation keeps WebRTC session data, chat history, and AI summaries cleanly attached to the _session_, distinct from the _booking_ record.
 
 ---
 
@@ -286,6 +302,7 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
 ## 6. Scope Split — MVP vs. Later
 
 **MVP (v1):**
+
 - Authentication (Patient/Consultant)
 - Doctor Profiles (with `TimeZoneId`, `IsVerified`) / Patient Profiles
 - Availability + Appointments (30-min slots, timezone-safe, concurrency-safe)
@@ -297,6 +314,7 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
 - Basic in-app notifications (SignalR)
 
 **Later (v2+):**
+
 - Admin dashboard / analytics / user management (including a UI for consultant verification)
 - Reviews & ratings
 - Medical records / attachments
@@ -316,7 +334,7 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
 
 ## 7. Out of Scope (v1)
 
-Explicitly *not* building initially:
+Explicitly _not_ building initially:
 
 - [ ] Multi-language support
 - [ ] Admin dashboard / analytics
@@ -353,24 +371,26 @@ None outstanding for v1 at this stage. Revisit if new architectural decisions co
 ## 10. ERD — Entities
 
 **Core:**
+
 - Users
-- ConsultantProfiles *(+ `TimeZoneId`, `IsVerified`, `ProfileImageUrl`)*
+- ConsultantProfiles _(+ `TimeZoneId`, `IsVerified`, `ProfileImageUrl`)_
 - PatientProfiles
 - AvailabilitySlots
-- Appointments *(+ `CancellationReason`, `CancelledAt`)*
+- Appointments _(+ `CancellationReason`, `CancelledAt`)_
 - Consultations
-- Payments *(+ `IdempotencyKey`, `StripeClientSecret`)*
-- ChatMessages *(+ `MessageType`, encrypted `Content`)*
+- Payments _(+ `IdempotencyKey`, `StripeClientSecret`)_
+- ChatMessages _(+ `MessageType`, encrypted `Content`)_
 - AISummaries
-- AIJobs *(status, retries, provider, prompt version, errors, + `ProcessingStartedAt`, `ErrorDetails`)*
-- Notifications *(+ `IsRead`, `ReadAt`, `Data` JSON for deep links)*
-- RefreshTokens *(store `TokenHash`, never the raw token — see security note below)*
+- AIJobs _(status, retries, provider, prompt version, errors, + `ProcessingStartedAt`, `ErrorDetails`)_
+- Notifications _(+ `IsRead`, `ReadAt`, `Data` JSON for deep links)_
+- RefreshTokens _(store `TokenHash`, never the raw token — see security note below)_
 
 **Deferred to v2 (do not model yet):**
+
 - MedicalRecords
 - Attachments
 - Reviews
-- AuditLog *(design entities with `CreatedAt`/`ModifiedAt` + soft delete now so this slots in later)*
+- AuditLog _(design entities with `CreatedAt`/`ModifiedAt` + soft delete now so this slots in later)_
 
 ---
 
