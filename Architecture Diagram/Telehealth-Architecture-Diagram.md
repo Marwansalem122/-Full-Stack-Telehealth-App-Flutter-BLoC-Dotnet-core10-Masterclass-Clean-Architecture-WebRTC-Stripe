@@ -2,7 +2,8 @@
 
 **System Design Series · Document 2 of 4** (ERD → **Architecture** → Sequence Diagrams → API Contract)
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
- 
+![Telehealth Architecture Diagram](../images/architecture-diagram.png)
+
 ---
 
 ## 1. ERD vs. Architecture Diagram — What's the Difference?
