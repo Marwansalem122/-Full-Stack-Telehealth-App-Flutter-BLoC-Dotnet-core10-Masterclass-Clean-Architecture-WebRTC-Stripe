@@ -62,6 +62,7 @@ erDiagram
         string Status
         string CancellationReason
         datetime CancelledAt
+        string IdempotencyKey UK
     }
 
     CONSULTATIONS {
@@ -79,7 +80,6 @@ erDiagram
         decimal Amount
         string Currency
         string StripePaymentIntentId
-        string StripeClientSecret
         string IdempotencyKey
         string Status
         datetime CreatedAt
@@ -133,5 +133,13 @@ erDiagram
         datetime ExpiresAt
         datetime CreatedAt
         datetime RevokedAt
+    }
+
+    STRIPE_WEBHOOK_EVENTS {
+        guid Id PK
+        string StripeEventId UK
+        string EventType
+        datetime ReceivedAt
+        datetime ProcessedAt
     }
 ```

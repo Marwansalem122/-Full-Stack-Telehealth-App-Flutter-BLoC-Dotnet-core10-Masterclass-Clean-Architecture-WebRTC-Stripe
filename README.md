@@ -2,7 +2,7 @@
 
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
 **Owner:** Marwan
-**Status:** Draft v11 — ERD cardinalities and business rules locked — v1 open questions resolved; production-hardening concerns (concurrency, timezone, security, reliability) incorporated
+**Status:** Draft v14 — fixed booking-retry logic bug, webhook made atomic/transactional, StripeClientSecret decision resolved, stale ERD-pending language removed, Next Steps updated
 
 ---
 
@@ -14,45 +14,43 @@ A full-stack Telehealth platform that connects patients with medical consultants
 
 ## 2. Actors
 
-| Actor                        | Description                                                                                                                                                       |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Patient**                  | Searches for consultants, books appointments, pays for consultations, chats/video calls with the doctor, receives AI-assisted suggestions.                        |
-| **Consultant (Doctor)**      | Manages availability, accepts/handles bookings, communicates with patients, receives consultation summaries. Must be verified before appearing in patient search. |
-| **Admin** _(deferred to v2)_ | Oversees platform operations — not part of v1, though a minimal manual verification path exists (see 3.1).                                                        |
+| Actor | Description |
+|---|---|
+| **Patient** | Searches for consultants, books appointments, pays for consultations, chats/video calls with the doctor, receives AI-assisted suggestions. |
+| **Consultant (Doctor)** | Manages availability, accepts/handles bookings, communicates with patients, receives consultation summaries. Must be verified before appearing in patient search. |
+| **Admin** *(deferred to v2)* | Oversees platform operations — not part of v1, though a minimal manual verification path exists (see 3.1). |
 
 ---
 
 ## 3. Functional Requirements (User Stories)
 
 ### 3.1 Authentication & Profiles
-
 - As a Patient/Consultant, I want to register and log in securely, so that I can access the platform.
 - As a Patient, I want to create and edit my profile (basic health info, contact details), so that consultants have context.
 - As a Consultant, I want to create a professional profile (specialty, bio, credentials, timezone), so that patients can evaluate me.
 - As a system, I want role-based authorization (Patient vs Consultant), so that each actor only accesses relevant endpoints.
 - As a system, I want to verify resource ownership on every request (not just authentication), so that Patient A can never access Patient B's data, and Consultant A can never access Consultant B's consultations.
-- As a system, I want a `ConsultantProfile.IsVerified` flag (default `false`), so that unverified consultants can complete their profile but do not appear in patient search until verified. _(v1: verification can be a manual DB update; no admin UI needed yet — the flag and the rule are what matter.)_
+- As a system, I want a `ConsultantProfile.IsVerified` flag (default `false`), so that unverified consultants can complete their profile but do not appear in patient search until verified. *(v1: verification can be a manual DB update; no admin UI needed yet — the flag and the rule are what matter.)*
 
-> **⚠️ Mutual exclusivity — a `User` must be a Patient XOR a Consultant, never both:** The ERD models `Users`→`ConsultantProfiles` and `Users`→`PatientProfiles` as two separate optional one-to-one relationships. That correctly stops a user from having _two_ Consultant Profiles, but nothing in the relationship itself stops a user from having _both_ a Consultant Profile _and_ a Patient Profile — most RDBMS (including SQL Server) don't support a plain CHECK constraint spanning two different tables.
->
+> **⚠️ Mutual exclusivity — a `User` must be a Patient XOR a Consultant, never both:** The ERD models `Users`→`ConsultantProfiles` and `Users`→`PatientProfiles` as two separate optional one-to-one relationships. That correctly stops a user from having *two* Consultant Profiles, but nothing in the relationship itself stops a user from having *both* a Consultant Profile *and* a Patient Profile — most RDBMS (including SQL Server) don't support a plain CHECK constraint spanning two different tables.
 > - **Primary enforcement (application layer):** `Users.Role` is set once at registration and treated as **immutable**. The `CreateConsultantProfile` command handler rejects the request unless `User.Role == Consultant`; `CreatePatientProfile` mirrors this for `Role == Patient`. As long as `Role` never changes after registration, this alone guarantees exclusivity.
 > - **Optional defense-in-depth (DB layer):** A database trigger on insert into either profile table that verifies no row exists for the same `UserId` in the other table — a safety net against an application-layer bug, useful as a learning exercise even if not strictly required for v1.
 
 ### 3.2 Scheduling & Booking
-
 - As a Consultant, I want to set my weekly availability (recurring time windows, e.g. Mon 09:00–13:00, **in my own timezone**), so that patients can only book free slots.
 - As a system, I want to compute actual bookable slots as `Weekly Availability − Existing Appointments`, so that double-booking is impossible.
 - As a system, I want a fixed appointment duration in v1 (**30 minutes**), so that slot calculation stays simple.
 - As a Patient, I want to search consultants by specialty, so that I can find the right doctor.
 - As a Patient, I want to view a consultant's available slots **converted to my local timezone**, so that times displayed are correct for me.
 - As a Patient, I want to book an appointment and receive confirmation, so that I know it's secured.
+- As a system, I want `POST /appointments` itself to accept a client-generated **Idempotency-Key** header, so that a lost response (network dies after the appointment is created but before Flutter receives the ID) can't cause the client to accidentally create a second appointment on retry.
 - As a Consultant, I want to see my upcoming appointments, so that I can prepare.
 - As a Patient/Consultant, I want to cancel or reschedule an appointment (basic rules only), so that plans can change.
 
-**Appointment Lifecycle** — modeled as an `AppointmentStatus` enum from day one:
+**Appointment Lifecycle** — modeled as an `AppointmentStatus` enum from day one. **Finalized** (see rationale below — `Paid` is not part of this enum):
 
 ```
-PendingPayment → Paid → Confirmed → InProgress → Completed
+PendingPayment → Confirmed → InProgress → Completed
 
 PendingPayment → PaymentFailed
 Confirmed      → Cancelled
@@ -60,51 +58,60 @@ Confirmed      → Rescheduled
 Confirmed      → NoShow
 ```
 
-> **⚠️ Decide during ERD design:** `Paid` may not need to be its own `AppointmentStatus` — `Payment.Status` (Section 3.3) already tracks payment state separately. Having "paid" represented in two places risks the two getting out of sync (e.g. `Payment.Status = Paid` but `Appointment.Status` still `PendingPayment`). Consider collapsing to:
->
-> ```
-> PendingPayment → Confirmed → InProgress → Completed
-> ```
->
-> where the transition to `Confirmed` is triggered directly by the Stripe webhook confirming `Payment.Status = Paid`, keeping `Payment` as the single source of truth for payment state. Finalize this when designing the ERD, not before.
+> **✅ Resolved: no separate `Paid` status on Appointment.** `Payment.Status` (Section 3.3) is the single source of truth for payment state. The Stripe webhook confirming `Payment.Status = Paid` transitions the Appointment directly to `Confirmed` in the same step — there is exactly one place that answers "was this paid," not two states that could drift out of sync.
 
-> **⚠️ Concurrency — booking race condition:** "Weekly Availability − Existing Appointments" alone is not enough to prevent double-booking if two patients book the same slot simultaneously. Enforce this at the **database level**, not just in application logic. Two viable approaches:
->
-> - **Option A (simpler):** A unique constraint on `(ConsultantId, StartTime, Status)` in the `Appointments` table (excluding `Cancelled` rows), so a duplicate insert fails at the DB level.
-> - **Option B:** Optimistic concurrency via `RowVersion`, or `WITH (UPDLOCK, HOLDLOCK)` when checking availability and creating the appointment inside the same transaction.
->   Decide and document the chosen approach during ERD/transaction design — this is a v1 requirement, not a nice-to-have.
+> **✅ Resolved: booking concurrency.** The v1 decision is finalized: **filtered unique indexes**, not optimistic locking:
+> - `UNIQUE (ConsultantId, ScheduledStartUtc) WHERE Status NOT IN (Cancelled, NoShow, PaymentFailed)` on the `Appointments` table, so a duplicate insert for an *active* booking fails at the DB level, while a cancelled appointment never blocks the slot.
+> This is used for both the consultant-side and patient-side constraints (see below) — see Section 8 for the full rationale.
 
 - As a system, I want to prevent a Patient from having overlapping active/upcoming appointments — even across different consultants — so that a patient can't double-book themselves into two consultations at once.
 
-> **⚠️ Patient-side overlap rule (distinct from the consultant race condition above):** The consultant-side constraint stops two _patients_ from booking the same _consultant_ slot. This is different — it stops the _same patient_ from booking two _different consultants_ at overlapping times. Since v1 fixes appointment duration to 30 minutes **and** availability slots are quantized to a fixed 30-minute grid (not offset per consultant), two overlapping appointments for the same patient will always share the exact same `ScheduledStartUtc`. That simplifies enforcement to:
->
-> - A unique constraint on `(PatientId, ScheduledStartUtc)` in `Appointments`, filtered to active statuses (excluding `Cancelled`/`NoShow`/`PaymentFailed`) — same pattern as the consultant-side constraint, just on the other foreign key.
+> **⚠️ Patient-side overlap rule (distinct from the consultant race condition above):** The consultant-side constraint stops two *patients* from booking the same *consultant* slot. This is different — it stops the *same patient* from booking two *different consultants* at overlapping times. Since v1 fixes appointment duration to 30 minutes **and** availability slots are quantized to a fixed 30-minute grid (not offset per consultant), two overlapping appointments for the same patient will always share the exact same `ScheduledStartUtc`. That simplifies enforcement to:
+> - `UNIQUE (PatientId, ScheduledStartUtc) WHERE Status NOT IN (Cancelled, NoShow, PaymentFailed)` on `Appointments` — same filtered-index pattern as the consultant-side constraint, just on the other foreign key.
 > - This check must happen inside the same transaction/lock as the consultant-side availability check (Option A/B above), not as a separate query — otherwise a race between the two checks reopens the same problem.
->   If a future version supports variable appointment durations, this simplification breaks and a true time-range overlap check (`NewStart < ExistingEnd AND NewEnd > ExistingStart`) is required instead — note this as a v2 migration risk if durations become variable.
+> If a future version supports variable appointment durations, this simplification breaks and a true time-range overlap check (`NewStart < ExistingEnd AND NewEnd > ExistingStart`) is required instead — note this as a v2 migration risk if durations become variable.
 
 > **⚠️ Timezone handling:** Availability set by a Cairo-based consultant and viewed by a Saudi-based patient must resolve correctly. Rule: **store all availability and appointment times in UTC**; `ConsultantProfile` carries a `TimeZoneId` (e.g. `"Africa/Cairo"`); the backend always returns UTC; the Flutter app converts to the device's local time for display. Add `TimeZoneId` to `ConsultantProfile` from v1 — retrofitting this later is painful.
 
-### 3.3 Payments
+> **⚠️ Booking idempotency is a separate concern from Stripe idempotency — both are needed.** The Stripe `Idempotency-Key` (Section 3.3) only protects the *PaymentIntent creation* call. It does nothing for the earlier step: if the network dies after `POST /appointments` successfully creates the Appointment but before Flutter receives the response, Flutter never learns the `AppointmentId` — and a naive retry of `POST /appointments` creates a **second, duplicate appointment**.
+> - `POST /appointments` itself must accept a client-generated `Idempotency-Key` header (a GUID Flutter generates once per booking attempt and reuses on retry).
+> - `Appointment.IdempotencyKey` is `UNIQUE`. On a retry with the same key, the API looks up the existing appointment — but **finding an existing appointment is not automatically "return it and stop."** The correct behavior depends on how far the *previous* attempt got:
+>   - If a `PaymentIntent` already exists for it → return the existing result (client secret included) — the original attempt succeeded past that point, nothing to redo.
+>   - If it's `PendingPayment` with **no** `PaymentIntent` yet (the original attempt died *before* reaching Stripe) → **resume** the flow and attempt `PaymentIntent` creation now, rather than just returning a half-finished result.
+>   Treating "key already exists" as always meaning "just return it" would silently strand a booking that failed before ever reaching Stripe — the retry has to be able to pick up where the previous attempt actually left off.
+> - The *same* key then flows through to the Stripe `PaymentIntent` call (`Payment.IdempotencyKey = Appointment.IdempotencyKey`) — one key, reused end-to-end, rather than generating a second, unrelated key at the Stripe step.
 
+### 3.3 Payments
 - As a Patient, I want to pay for a consultation via Stripe at booking time, so that the appointment is confirmed only after payment.
 - As a system, I want to create a Stripe PaymentIntent when a booking starts, so that payment can be tracked end-to-end.
 - As a system, I want to verify payment success **only via Stripe Webhooks** (never trust the Flutter client's claim that payment succeeded), so that appointment status updates reliably and securely.
-- As a system, I want to send an **Idempotency-Key** (e.g. the `AppointmentId` or a GUID stored with the appointment) on the Stripe PaymentIntent creation call, so that a network retry from the client can't create a duplicate PaymentIntent.
+- As a system, I want to send an **Idempotency-Key** on the Stripe PaymentIntent creation call — the *same* key as `Appointment.IdempotencyKey` (Section 3.2), not a separately generated one — so that a network retry from the client can't create a duplicate PaymentIntent.
 - As a Consultant, I want to see my earnings/payout summary, so that I can track income.
 
 **Payment flow — ordering matters (Stripe calls should not sit inside a DB transaction, since the API call can be slow and would hold a connection/lock):**
-
 ```
 1. Create Appointment (Status = PendingPayment) in DB — atomic with any related writes
 2. Call Stripe to create PaymentIntent (with Idempotency-Key)
 3. Update Appointment/Payment with the returned PaymentIntentId + ClientSecret
 4. Stripe → Webhook → ASP.NET Core → Mark Payment = Paid → Appointment = Confirmed
 ```
+If step 2 fails after step 1 succeeds, the Appointment stays `PendingPayment` and can be retried (resuming from step 2, per the idempotency-key logic above) or expired by a cleanup job — avoids orphaned payments without needing a distributed transaction.
 
-If step 2 fails after step 1 succeeds, the Appointment stays `PendingPayment` and can be retried or expired by a cleanup job — avoids orphaned payments without needing a distributed transaction.
+> **⚠️ Webhook idempotency needs an atomic mechanism, not a "check then insert" race:** two near-simultaneous deliveries of the same webhook event could both pass a `SELECT ... WHERE StripeEventId = ?` check before either has inserted its row — a plain "check, then process, then record" sequence has a race window. Make the **insert itself** the atomicity boundary, not a separate check beforehand:
+> ```
+> StripeWebhookEvents
+> - Id
+> - StripeEventId   UNIQUE
+> - EventType
+> - ReceivedAt
+> - ProcessedAt
+> ```
+> Flow: verify signature → **attempt to `INSERT` the `StripeEventId` row first** → if the insert fails (unique constraint violation), another request already claimed this event — return `200` without reprocessing → if the insert succeeds, this request has exclusively claimed the event and proceeds to process it. The `UNIQUE` constraint is what makes this atomic; a prior `SELECT` check does not.
+> **Process the whole thing as one transaction:** `INSERT StripeWebhookEvent` + `Payment.Status = Paid` + `Appointment.Status = Confirmed` + `Create Notification`, committed together. If any step fails, the whole webhook attempt rolls back and Stripe's automatic retry will redeliver — rather than risking a partial state like `Payment = Paid` with `Appointment` still `PendingPayment`, or a `Confirmed` appointment with no notification ever created. `SignalR` delivery happens *after* the transaction commits, consistent with "persist first, notify second."
+
+> **⚠️ PaymentIntent creation failure is a named branch, not just an implied edge case:** if the call to Stripe in step 2 fails outright (network error, Stripe downtime), the Appointment remains `PendingPayment` and the API returns a clear "payment initialization failed" response to the client — the client can retry the booking request (safe, thanks to the Idempotency-Key) rather than being left in an ambiguous state. A `PendingPayment` appointment that never completes payment should eventually be expired by a cleanup job (exact expiry window is a v1 implementation detail, not an open design question).
 
 **Payment entity (draft):**
-
 ```
 Payment
 - Id
@@ -112,15 +119,29 @@ Payment
 - Amount
 - Currency
 - StripePaymentIntentId
-- StripeClientSecret   (returned to Flutter to complete payment)
 - IdempotencyKey
 - Status
 - CreatedAt
 - PaidAt
 ```
 
-### 3.4 Real-time Chat & Video (WebRTC)
+> **✅ Resolved: `StripeClientSecret` is not persisted.** It's returned to Flutter directly at creation time and never stored in `Payment` — there's no v1 use case that needs the backend to retrieve it later (e.g. no server-side payment-resumption flow). Being sensitive, the fewer places it's stored, the smaller the exposure surface; not persisting it also means one less thing to ensure never leaks into logs.
+>
+> **⚠️ Retrieval behavior on retry (must be documented in API Contract):** Because `StripeClientSecret` is not persisted, a retry with an existing `Idempotency-Key` that already has a `PaymentIntentId` cannot simply return the stored record — the `ClientSecret` is gone. Instead, the backend must:
+> ```
+> Existing Appointment found
+>     ↓
+> PaymentIntentId exists?
+>     ↓ YES
+> Retrieve PaymentIntent from Stripe (using the stored PaymentIntentId)
+>     ↓
+> Extract ClientSecret from Stripe response
+>     ↓
+> Return ClientSecret to Flutter
+> ```
+> This is a single Stripe API call (`GET /v1/payment_intents/{id}`) and is safe because the `PaymentIntent` was created by this same backend (same Stripe account). This retrieval step must be explicitly documented in the API Contract for `POST /appointments` so the retry path is fully specified.
 
+### 3.4 Real-time Chat & Video (WebRTC)
 - As a Patient/Consultant, I want to exchange real-time messages before/during a consultation, so that we can communicate asynchronously.
 - As a system, I want chat messages persisted to the database (not just delivered live), so that conversation history survives reconnects and is available later.
 - As a system, I want chat message content encrypted at rest (application-layer encryption or SQL Server column-level encryption on `ChatMessage.Content`), so that patient health-related conversations aren't stored in plaintext.
@@ -128,10 +149,11 @@ Payment
 - As a system, I want to use SignalR **only** as the signaling layer for WebRTC (exchanging Offer/Answer/ICE Candidates/Call Events) — SignalR is not the media transport; actual audio/video flows over WebRTC peer connections.
 - As a system, I want to use a STUN server for NAT traversal, and fall back to a TURN server when a direct peer connection fails, so that calls succeed across different network conditions.
 
-> **⚠️ Chat authorization rule (not visible from the FK alone):** `ChatMessage.SenderId → Users.Id` only says _a_ valid user sent the message — it does not say that user was allowed to send it _in that appointment_. The `SenderId` FK must be checked against `Appointment.PatientId`/`Appointment.ConsultantId`: **the sender must be one of the two participants of that appointment.** This is the same resource-ownership principle from Section 3.1 applied to chat specifically — enforce it in the SignalR Hub method / command handler before persisting a message, not just at the database schema level (a plain FK constraint can't express "must be one of these two specific users").
+> **⚠️ Chat authorization rule (not visible from the FK alone):** `ChatMessage.SenderId → Users.Id` only says *a* valid user sent the message — it does not say that user was allowed to send it *in that appointment*. The `SenderId` FK must be checked against `Appointment.PatientId`/`Appointment.ConsultantId`: **the sender must be one of the two participants of that appointment.** This is the same resource-ownership principle from Section 3.1 applied to chat specifically — enforce it in the SignalR Hub method / command handler before persisting a message, not just at the database schema level (a plain FK constraint can't express "must be one of these two specific users").
+
+> **⚠️ Joining a call needs an appointment-status check, not just a participant check:** being a legitimate participant of the appointment (resource ownership) is necessary but not sufficient — a participant could still try to join a `Cancelled` or already-`Completed` appointment. `JoinCall` must validate both: (1) caller is a participant, and (2) `Appointment.Status` is in an allowed state (`Confirmed`/`InProgress`) before permitting the call to start. Exact allowed-status list is a v1 implementation detail, not an open design question — the principle (validate status, not just identity) is what matters here.
 
 **Chat message entity (draft):**
-
 ```
 ChatMessage
 - Id
@@ -169,7 +191,6 @@ User ──API──► AI Use Cases ──► IAIService (abstraction) ──�
 ```
 
 `IAIService` example (conceptual):
-
 ```csharp
 public interface IAIService
 {
@@ -185,18 +206,22 @@ Implementation goes through **`Microsoft.Extensions.AI`** as the provider abstra
 
 #### Consultation Summary — Asynchronous Pipeline
 
-Rather than making the user wait synchronously for the LLM after a call ends, the summary is generated as a background job triggered by a domain event:
+Rather than making the user wait synchronously for the LLM after a call ends, the summary is generated as background work, independent of the request/response cycle:
 
 ```
-Consultation Completed
+CompleteConsultation Command
         ↓
-Publish Event (ConsultationCompleted via MediatR Notification)
+DB Transaction
+  ├── Consultation.Status = Completed
+  └── AIJob created (Status = Pending)
         ↓
-Hosted BackgroundService
+Commit (API returns immediately — no waiting on AI)
         ↓
-AIJob created (Status = Pending)
+Hosted BackgroundService independently polls for Pending jobs
         ↓
-Collect Consultation Context (Chat Messages + Transcript, when available)
+Atomic job claim (Status = Pending → Processing, in one update)
+        ↓
+Collect Consultation Context (Chat Messages — v1; Transcript in v2, when available)
         ↓
 Build AI Prompt (versioned)
         ↓
@@ -209,15 +234,20 @@ Persist AISummary
 Notify Consultant
 ```
 
+> **✅ Resolved: `AIJob` is created transactionally, not via a published event.** `Consultation.Status = Completed` and `AIJob` creation happen in the **same database transaction** as the `CompleteConsultation` command — not through a domain event that a separate handler reacts to. This is simpler and more reliable for v1: an event-based approach only pays off with an Outbox Pattern (guaranteeing the event is never lost between commit and publish), which is explicitly out of scope for v1 (no message broker, no Outbox). The `BackgroundService` polls the database directly for `Pending` jobs rather than reacting to a published event.
+
 > **⚠️ Background job reliability:** If the server restarts mid-job, an in-memory-only `BackgroundService` loses track of it. Persist job state so it can recover:
->
-> - `AIJob.Status` transitions to `Processing` with `ProcessingStartedAt` set when work begins.
+> - `AIJob.Status` transitions to `Processing` with `ProcessingStartedAt` set when work begins — and this claim must be **atomic** (a single conditional update, e.g. `UPDATE ... SET Status='Processing' WHERE Status='Pending'`, checking rows affected), so that if the service ever runs as more than one instance, two workers can never both claim the same job.
 > - On startup (or on a polling interval), the service picks up jobs where `Status = Pending`, **or** `Status = Processing AND ProcessingStartedAt < Now.AddMinutes(-10)` (stuck jobs get retried).
->   This makes the pipeline self-healing across restarts without needing a message queue in v1.
+> This makes the pipeline self-healing across restarts without needing a message queue in v1.
+
+> **⚠️ Retry policy — bounded, not infinite:** `RetryCount` must be checked against a `MaxRetries` ceiling (exact numbers aren't critical for v1 — e.g. 3 attempts with increasing backoff between them) before requeuing as `Pending`. Once `RetryCount` reaches the max, the job moves to a terminal `Failed` status rather than retrying forever.
+
+> **⚠️ Duplicate-summary protection:** if saving an `AISummary` fails after a successful AI call, a subsequent retry could call the AI provider again and attempt to persist a second summary for the same consultation. Add `UNIQUE (ConsultationId)` on `AISummaries` as a hard backstop — consistent with the `0..1` cardinality decision below, this makes that cardinality enforced by the database, not just assumed by application logic.
 
 > **⚠️ Cardinality decision — retry vs. versioning:** `AIJob` retries (via `RetryCount`) reuse the same row and never persist an `AISummary` until one attempt succeeds — this is why `Consultation → AISummary` stays a `0..1` relationship in v1 (see Section 8 for the full rationale). If future prompt/provider experimentation needs a kept history of multiple summaries per consultation, that's a `0..*` relationship change, not something this pipeline needs to support today.
 
-This is intentionally the same event-driven pattern used elsewhere in production systems, and teaches: domain/application events, background processing, retry, idempotency, AI failure handling, and post-completion notifications — not just "how to call an LLM."
+This is intentionally the same background-processing pattern used elsewhere in production systems, and teaches: transactional job creation, atomic claiming, retry with bounded backoff, idempotency, AI failure handling, and post-completion notifications — not just "how to call an LLM."
 
 #### Scoping: Chat vs. Voice Transcript
 
@@ -244,13 +274,12 @@ The **architecture** supports both chat-based and voice-based context from day o
 - **v1:** Chat-based consultation summary, AI provider abstraction, structured output, retry/timeout/failure handling.
 - **v2:** Speech-to-Text integration, voice transcript, transcript + chat combined summary.
 
-### 3.6 Notifications _(in v1 scope, in-app only)_
-
+### 3.6 Notifications *(in v1 scope, in-app only)*
 - As a Patient/Consultant, I want to receive in-app notifications for key events, so that I stay informed without checking manually.
 - Events to cover in v1: Appointment booked, Appointment confirmed, Appointment cancelled, Appointment starting soon, Doctor joined consultation.
 - As a system, I want to deliver in-app notifications via SignalR, so that no extra infrastructure is needed for v1.
 - As a Patient/Consultant, I want to see which notifications are unread, so that I can tell what's new.
-- _(Push notifications via FCM remain out of scope for v1 — see Section 7.)_
+- *(Push notifications via FCM remain out of scope for v1 — see Section 7.)*
 
 ---
 
@@ -270,7 +299,7 @@ Appointment (1:1) Consultation
                      └── Summary
 ```
 
-This separation keeps WebRTC session data, chat history, and AI summaries cleanly attached to the _session_, distinct from the _booking_ record.
+This separation keeps WebRTC session data, chat history, and AI summaries cleanly attached to the *session*, distinct from the *booking* record.
 
 ---
 
@@ -283,7 +312,7 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
   - Every request must verify **resource ownership**, not just authentication — e.g. `GET /appointments/123` must confirm the caller is a participant of appointment 123, not merely that they're logged in.
   - `ChatMessage.Content` must be encrypted at rest (see 3.4).
   - Refresh tokens must never be stored as plain text. Store `TokenHash` (e.g. `SHA256`/`HMACSHA256` of the raw token) — on refresh, hash the incoming token and compare against the stored hash. If the database leaks, stored hashes alone are not directly usable as valid tokens.
-- **Concurrency:** Appointment booking must be safe under concurrent requests — enforced via a DB-level unique constraint or optimistic locking (see 3.2). No double-booking under any timing scenario.
+- **Concurrency:** Appointment booking must be safe under concurrent requests — enforced via filtered unique indexes (see 3.2 and Section 8). No double-booking under any timing scenario.
 - **Performance:** Real-time chat/call should have minimal perceptible lag. AI responses should return within a few seconds (define an acceptable threshold, e.g. <5s, and handle timeouts gracefully).
 - **Reliability:**
   - Stripe webhook handling must be idempotent (safe to receive duplicate events).
@@ -302,7 +331,6 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
 ## 6. Scope Split — MVP vs. Later
 
 **MVP (v1):**
-
 - Authentication (Patient/Consultant)
 - Doctor Profiles (with `TimeZoneId`, `IsVerified`) / Patient Profiles
 - Availability + Appointments (30-min slots, timezone-safe, concurrency-safe)
@@ -310,11 +338,10 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
 - Chat (persisted + encrypted at rest, SignalR real-time delivery)
 - SignalR + WebRTC (with STUN/TURN)
 - AI Symptom Checker (via `IAIService` abstraction, structured output, rate-limited)
-- AI Consultation Summary — chat-based, async/event-driven pipeline, with retry/failure handling and restart recovery
+- AI Consultation Summary — chat-based, async pipeline with transactional job creation and DB polling, retry/failure handling and restart recovery
 - Basic in-app notifications (SignalR)
 
 **Later (v2+):**
-
 - Admin dashboard / analytics / user management (including a UI for consultant verification)
 - Reviews & ratings
 - Medical records / attachments
@@ -334,7 +361,7 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
 
 ## 7. Out of Scope (v1)
 
-Explicitly _not_ building initially:
+Explicitly *not* building initially:
 
 - [ ] Multi-language support
 - [ ] Admin dashboard / analytics
@@ -358,7 +385,11 @@ Explicitly _not_ building initially:
 - **Consultant Verification (v1):** `IsVerified` boolean, manually flipped in the database for now — no admin UI needed until v2.
 - **AI Summary cardinality — one final summary per consultation in v1:** `Consultation → 0..1 AISummary` is a deliberate decision, not just a default cardinality. `AIJob` already models retries as a single row with an incrementing `RetryCount` (not one row per attempt), so only the successful attempt ever persists an `AISummary`. If a future version needs to keep a history of summaries across different prompt versions or providers (true versioning, not retry), this relationship would need to change to `Consultation → 0..* AISummary` with an `IsCurrent`/`GeneratedAt` marker to identify the latest — that's an explicit v2 schema change, not something v1 needs to accommodate now.
 - **RefreshToken fields (v1 minimal set):** `UserId`, `TokenHash`, `ExpiresAt`, `CreatedAt`, `RevokedAt` — sufficient for v1. Richer fields (`DeviceId`, `UserAgent`, `IpAddress`, `RevokedReason`) are useful for multi-device session management and audit trails, but are a deliberate v2 addition, not required to ship v1 securely.
-- **Booking Concurrency Control:** To be finalized during ERD design between a unique DB constraint and optimistic locking (see 3.2) — both are acceptable v1 approaches; pick one and document it.
+- **Booking Concurrency Control:** ✅ Finalized (see Section 3.2 and the Sequence Diagrams document) — **filtered unique indexes**, not optimistic locking:
+  ```sql
+  UNIQUE (ConsultantId, ScheduledStartUtc) WHERE Status NOT IN (Cancelled, NoShow, PaymentFailed)
+  UNIQUE (PatientId, ScheduledStartUtc)    WHERE Status NOT IN (Cancelled, NoShow, PaymentFailed)
+  ```
 
 ---
 
@@ -371,26 +402,25 @@ None outstanding for v1 at this stage. Revisit if new architectural decisions co
 ## 10. ERD — Entities
 
 **Core:**
-
 - Users
-- ConsultantProfiles _(+ `TimeZoneId`, `IsVerified`, `ProfileImageUrl`)_
+- ConsultantProfiles *(+ `TimeZoneId`, `IsVerified`, `ProfileImageUrl`)*
 - PatientProfiles
 - AvailabilitySlots
-- Appointments _(+ `CancellationReason`, `CancelledAt`)_
+- Appointments *(+ `CancellationReason`, `CancelledAt`, `IdempotencyKey` UNIQUE — see booking idempotency note in Section 3.2)*
 - Consultations
-- Payments _(+ `IdempotencyKey`, `StripeClientSecret`)_
-- ChatMessages _(+ `MessageType`, encrypted `Content`)_
-- AISummaries
-- AIJobs _(status, retries, provider, prompt version, errors, + `ProcessingStartedAt`, `ErrorDetails`)_
-- Notifications _(+ `IsRead`, `ReadAt`, `Data` JSON for deep links)_
-- RefreshTokens _(store `TokenHash`, never the raw token — see security note below)_
+- Payments *(+ `IdempotencyKey`; `StripeClientSecret` deliberately NOT persisted — see Section 3.3)*
+- ChatMessages *(+ `MessageType`, encrypted `Content`)*
+- AISummaries *(`ConsultationId` UNIQUE — backstops the `0..1` cardinality against a retry-after-partial-failure race)*
+- AIJobs *(status, retries, provider, prompt version, errors, + `ProcessingStartedAt`, `ErrorDetails`)*
+- Notifications *(+ `IsRead`, `ReadAt`, `Data` JSON for deep links)*
+- RefreshTokens *(store `TokenHash`, never the raw token — see security note below)*
+- StripeWebhookEvents *(`StripeEventId` UNIQUE — makes webhook idempotency concrete, see Section 3.3)*
 
 **Deferred to v2 (do not model yet):**
-
 - MedicalRecords
 - Attachments
 - Reviews
-- AuditLog _(design entities with `CreatedAt`/`ModifiedAt` + soft delete now so this slots in later)_
+- AuditLog *(design entities with `CreatedAt`/`ModifiedAt` + soft delete now so this slots in later)*
 
 ---
 
@@ -426,10 +456,13 @@ None outstanding for v1 at this stage. Revisit if new architectural decisions co
 
 ## 12. Next Steps
 
-1. Build detailed ERD diagram from the entity list in Section 10 (relationships, keys) — including resolving the `AppointmentStatus` vs. `Payment.Status` overlap flagged in Section 3.2, and choosing the booking concurrency-control approach (unique constraint vs. optimistic locking).
-2. Build sequence diagrams for the three most complex flows:
-   - Booking → Payment → Confirmation flow (including the idempotency-key and non-transactional Stripe call ordering)
-   - WebRTC call establishment flow (signaling → STUN → TURN fallback)
-   - Consultation Completed → async AI Summary pipeline (event → BackgroundService → AIJob → IAIService → LLM → validation → persistence → notification), including stuck-job recovery
-3. Design `IAIService` interface and the two initial use cases (`AnalyzeSymptoms`, `SummarizeConsultation`) before writing any provider-specific code.
-4. Decide the chat encryption approach (application-layer vs. SQL Server column-level encryption) before implementing `ChatMessage`.
+**Completed (System Design series):**
+1. ✅ ERD — finalized (entities, relationships, filtered unique indexes, `AppointmentStatus` vs. `Payment.Status` resolved)
+2. ✅ Architecture Diagram + Deployment Diagram — finalized
+3. ✅ Sequence Diagrams — finalized for the three complex flows (Booking → Payment → Confirmation, WebRTC call establishment, Consultation → AI Summary)
+
+**Remaining before implementation:**
+4. Design the **API Contract** — endpoint list, request/response shapes, validation, authorization, and status codes, building directly on the finalized sequence diagrams.
+5. Design the **`IAIService` interface contract** — `AnalyzeSymptomsAsync` and `SummarizeConsultationAsync` signatures, input/output DTOs, and provider-agnostic abstractions. This is an internal implementation contract, not part of the public API surface.
+6. Decide the **chat encryption approach** (application-layer vs. SQL Server column-level encryption) before implementing `ChatMessage`.
+7. **Implementation** — begin coding against the finalized contracts above.

@@ -3,26 +3,22 @@
 **System Design Series · Document 2 of 4** (ERD → **Architecture** → Sequence Diagrams → API Contract)
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
 
-## Architecture Diagram
+![Architecture Diagram](./architecture-diagram.png)
 
-![Telehealth Architecture Diagram](../images/architecture-diagram.png)
-
-##Telehealth Depolyment Diagram
-
-## ![Telehealth Deployment Diagram](../images/deployment-diagram.png)
+---
 
 ## 1. ERD vs. Architecture Diagram — What's the Difference?
 
 These two diagrams answer two completely different questions:
 
-- **ERD (Entity Relationship Diagram):** answers _"how is the data stored, and how are the tables related to each other?"_ — it's about persistence.
-- **Architecture Diagram:** answers _"what does the whole system consist of, and how does each part talk to the others?"_ — it's about components and communication.
+- **ERD (Entity Relationship Diagram):** answers *"how is the data stored, and how are the tables related to each other?"* — it's about persistence.
+- **Architecture Diagram:** answers *"what does the whole system consist of, and how does each part talk to the others?"* — it's about components and communication.
 
 In short: the ERD tells you the shape of the data; the architecture diagram tells you the shape of the system. Both are needed, and they should stay consistent with each other — for example, the Architecture Diagram says "there is a relational database," and the ERD says "here is exactly what that database looks like."
 
 ## 2. The Big Picture
 
-The diagram above is the final, agreed architecture for v1. Before breaking it down piece by piece, here is the reasoning behind why each component exists — understanding the _why_ matters far more than memorizing the picture.
+The diagram above is the final, agreed architecture for v1. Before breaking it down piece by piece, here is the reasoning behind why each component exists — understanding the *why* matters far more than memorizing the picture.
 
 ---
 
@@ -40,13 +36,11 @@ The project has one Flutter app with two Flavors — a **Patient flavor** and a 
 > **The one rule that matters most here: Flutter must never contain sensitive business rules.** The client can be wrong, outdated, or tampered with — so it should never be trusted to make decisions that affect data integrity or security.
 
 **Wrong (Flutter decides):**
-
 ```
 Flutter sees "slot looks free" -> assumes it can book it directly
 ```
 
 **Correct (Backend decides):**
-
 ```
 Flutter
   |
@@ -97,7 +91,7 @@ This is what's meant by a **Modular Monolith**: one deployable application, but 
 
 ## 5. SQL Server (Primary Database)
 
-The system's single source of truth for durable data: Users, PatientProfiles, ConsultantProfiles, Appointments, Consultations, Payments, ChatMessages, AISummaries, AIJobs, Notifications, RefreshTokens. This maps directly onto the ERD built earlier — the relationship between the two documents is simple:
+The system's single source of truth for durable data: Users, PatientProfiles, ConsultantProfiles, Appointments, Consultations, Payments, ChatMessages, AISummaries, AIJobs, Notifications, RefreshTokens, and StripeWebhookEvents. This maps directly onto the ERD built earlier — the relationship between the two documents is simple:
 
 ```
 Architecture Diagram says:  "there is a relational database."
@@ -128,7 +122,6 @@ Flutter ────┼── API #2
 Not everything the API does should happen synchronously inside an HTTP request. The clearest example in this system is generating an AI consultation summary — a slow, unreliable, external-dependency call that should never block a client waiting on a response.
 
 **What NOT to do:**
-
 ```
 POST /consultations/{id}/complete
   |
@@ -136,7 +129,6 @@ Call AI -> wait 10 seconds -> generate summary -> return response   (BAD design)
 ```
 
 **What the system actually does instead:**
-
 ```
 API
   |
@@ -221,13 +213,11 @@ Update Payment status
 This part deserves special attention because it breaks the usual client-server-client pattern. The actual audio/video media must **not** flow through the ASP.NET Core API:
 
 **Wrong (inefficient — API becomes a media relay):**
-
 ```
 Flutter -> ASP.NET Core -> Flutter
 ```
 
 **Correct (peer-to-peer media, backend only brokers the handshake):**
-
 ```
 Patient device (Patient flavor)
        ↕
@@ -270,15 +260,21 @@ ASP.NET Core
 Consultant
 ```
 
-When the patient sends _"Hello Doctor"_, the server does two things in parallel:
+When the patient sends *"Hello Doctor"*, the server **persists first, then notifies** — never the reverse:
 
 ```
-Save message -> SQL Server
-        |
+Patient
+  |
+SignalR
+  |
+ASP.NET Core
+  |
+Save message -> SQL Server (commit)
+  |
 Broadcast in real time -> Consultant
 ```
 
-> **SQL Server is the persistence layer; SignalR is the real-time delivery layer.** This distinction matters — losing the SignalR connection should never mean losing the message, because the database write does not depend on the delivery succeeding.
+> **SQL Server is the persistence layer; SignalR is the real-time delivery layer.** This distinction matters — losing the SignalR connection should never mean losing the message, because the database write is committed before the broadcast is attempted. If the broadcast fails, the message is still safely stored and will be delivered on reconnect or via the notification history.
 
 ---
 
@@ -306,15 +302,15 @@ The `Notifications` table is the persistent history of what happened; the delive
 An architecture diagram answers one question: **"what is the system made of?"** — not "what are all its tables and classes?" That's a different, more detailed diagram (ERD / Component / Class design).
 
 | Belongs in Architecture Diagram | Belongs in ERD / Component / Class Design instead |
-| ------------------------------- | ------------------------------------------------- |
-| Client                          | Appointment                                       |
-| API                             | PatientProfile                                    |
-| Database                        | AIJob                                             |
-| Cache                           | Payment                                           |
-| Background Worker               | (any individual table or class)                   |
-| AI Provider                     |                                                   |
-| Payment Provider                |                                                   |
-| Realtime layer                  |                                                   |
+|---|---|
+| Client | Appointment |
+| API | PatientProfile |
+| Database | AIJob |
+| Cache | Payment |
+| Background Worker | (any individual table or class) |
+| AI Provider | |
+| Payment Provider | |
+| Realtime layer | |
 
 ---
 
@@ -407,7 +403,7 @@ The concept mattering more than the specific tool is the point — the system sh
 
 Notifications in v1 stay exactly as already decided: `Notification → SignalR → Flutter`, with FCM push deferred to v2. That doesn't change.
 
-What's worth adding at the _design_ level (not the implementation level) is the shape the abstraction should take once more channels are added:
+What's worth adding at the *design* level (not the implementation level) is the shape the abstraction should take once more channels are added:
 
 ```
 INotificationService
@@ -427,7 +423,6 @@ Nothing here needs building now — the value is simply designing the `Notificat
 The Requirements Document already defers `MedicalRecords` and `Attachments` to v2, so file/object storage should **not** be added to the v1 architecture just for completeness. Adding infrastructure ahead of an actual requirement is exactly the kind of premature complexity Section 15 already warns against.
 
 For reference, once v2 needs it:
-
 ```
 ASP.NET Core
       │
@@ -438,7 +433,6 @@ Object Storage
       ├── Attachments
       └── Images
 ```
-
 This is documented here only so the shape is known in advance — it is **not** part of the v1 diagram.
 
 ---
@@ -486,7 +480,7 @@ Environment
 └── Production    (live users)
 ```
 
-Keeping this diagram separate from the logical one matters: the _logical_ architecture (modules, data flow, abstractions) stays the same across environments — only _how_ and _where_ it's deployed changes. Conflating the two makes both diagrams harder to read.
+Keeping this diagram separate from the logical one matters: the *logical* architecture (modules, data flow, abstractions) stays the same across environments — only *how* and *where* it's deployed changes. Conflating the two makes both diagrams harder to read.
 
 ---
 
@@ -513,7 +507,7 @@ In both cases, ASP.NET Core never carries the audio/video itself — its only ro
 
 Rating the architecture as it now stands, purely from a "learning production-grade system design" lens: **8.5–9/10.**
 
-The gap was never a missing _technology_ — it was under-specifying a few _concerns_:
+The gap was never a missing *technology* — it was under-specifying a few *concerns*:
 
 - 🔐 Authentication / Authorization flow — now explicit (Section 16)
 - 📊 Observability — now included as a v1 baseline (Section 17)
@@ -527,4 +521,8 @@ The things still deliberately excluded remain the same, and for the same reason:
 
 ---
 
-**Next in the System Design series:** Sequence Diagrams for the three most complex flows — Booking → Payment → Confirmation, WebRTC call establishment, and the async AI Summary pipeline — followed by the full API Contract.
+**Next in the System Design series:**
+1. The full **API Contract** — endpoint list, request/response shapes, validation, authorization, status codes, and SignalR Hub contracts.
+2. The **`IAIService` interface contract** — internal abstraction signatures and DTOs, separate from the public API surface.
+3. **Chat encryption decision** — application-layer vs. SQL Server column-level encryption.
+4. **Implementation** — begin coding against the finalized contracts above.
