@@ -98,7 +98,7 @@ erDiagram
 
     AI_SUMMARIES {
         guid Id PK
-        guid ConsultationId FK
+        guid ConsultationId FK, UK
         string ChiefComplaint
         json StructuredOutput
         datetime CreatedAt
@@ -106,7 +106,7 @@ erDiagram
 
     AI_JOBS {
         guid Id PK
-        guid ConsultationId FK
+        guid ConsultationId FK, UK
         string Status
         datetime ProcessingStartedAt
         int RetryCount
