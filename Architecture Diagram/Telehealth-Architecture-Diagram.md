@@ -1,6 +1,6 @@
 # AI Telehealth Platform — Architecture Diagram (Detailed Reference)
 
-**System Design Series · Document 2 of 4** (ERD → **Architecture** → Sequence Diagrams → API Contract)
+**System Design Series · Document 2 of 5** (ERD → **Architecture** → Sequence Diagrams → API Contract → Security Deep-Dive)
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
 
 ![Architecture Diagram](./architecture-diagram.png)
@@ -208,6 +208,29 @@ Update Payment status
 
 ---
 
+## 10.5. Email Service (SendGrid / AWS SES)
+
+The system requires transactional email for two security-critical flows:
+- **Email Verification** — sent automatically on registration
+- **Password Reset** — sent on request via `/auth/forgot-password`
+
+```
+ASP.NET Core
+      |
+      ▼
+Email Service (SendGrid / AWS SES / Mailgun)
+      |
+      ├── Verification emails
+      └── Password reset emails
+```
+
+**Design principles:**
+- The backend never trusts email delivery status for security decisions. Token expiry is time-based (1h for reset, 24h for verification), not delivery-status-based.
+- Email sending is **fire-and-forget** from the API's perspective — failures are logged but don't block the HTTP response (the user already got their 201/200 response before email sending completes).
+- In v1, email sending can be synchronous within the request (simplest) or queued via the same `BackgroundService` pattern used for AI jobs. The decision is an implementation detail; the architecture supports either.
+
+---
+
 ## 11. WebRTC — A Fundamentally Different Kind of Connection
 
 This part deserves special attention because it breaks the usual client-server-client pattern. The actual audio/video media must **not** flow through the ASP.NET Core API:
@@ -338,7 +361,7 @@ SQL Server
     |
 Background Worker
 
-  + SignalR, Stripe, WebRTC, AI Provider (as needed)
+  + SignalR, Stripe, WebRTC, AI Provider, Email Service (as needed)
   + Redis (only once there's a real, present need for it)
 ```
 
@@ -351,7 +374,7 @@ The Requirements Document already says Flutter handles login/token storage/refre
 ```
 Flutter
    │
-   │ Access Token (JWT)
+   │ Access Token (JWT, 15min)
    ▼
 ASP.NET Core
    │
@@ -362,15 +385,57 @@ ASP.NET Core
 ```
 Flutter
    │
-   │ Refresh Token
+   │ Refresh Token (7 days, stored in Secure Storage)
    ▼
 Auth Endpoint
    │
    ▼
-Token Rotation (incoming token is hashed and compared against TokenHash — see ERD security note)
+Token Rotation + Reuse Detection
+   │
+   ├── Hash incoming token (SHA256) → compare against TokenHash
+   ├── Generate new token → hash → store
+   ├── Revoke old token (record ReplacedByTokenId, RevocationReason)
+   └── Reuse Detection: if revoked token is used → delete entire family
 ```
 
+**Security layers:**
+- **Token hashing** — raw refresh token never touches the database; only `SHA256(Token)` is stored.
+- **Rotation** — every refresh produces a new token and invalidates the old one. This limits the window of opportunity if a token is stolen.
+- **Reuse detection** — if an attacker uses a stolen token *after* the legitimate user has already rotated it, the system detects this (the token is now marked revoked) and deletes **all** tokens in that family. Both attacker and legitimate user are forced to re-login — the legitimate user will notice and can secure their account.
+- **Family binding** — all tokens from the same initial login share a `FamilyId`, enabling the nuclear option above.
+
 No external Auth Server is needed for this. ASP.NET Core's own Identity + JWT handling is sufficient for v1 — this is purely about making an already-decided flow visible in the diagram, not a new component.
+
+---
+
+## 16.5. Security Architecture — Defense in Depth
+
+The security design follows a layered approach, consistent with the Security Deep-Dive document:
+
+```
+┌─────────────────────────────────────────────┐
+│  Layer 1: Endpoint Rate Limiting            │
+│  (.NET Rate Limiter — per-IP)               │
+├─────────────────────────────────────────────┤
+│  Layer 2: Account Lockout                   │
+│  (ASP.NET Core Identity — 5 fails/15min)    │
+├─────────────────────────────────────────────┤
+│  Layer 3: Progressive Delays                │
+│  (Custom middleware — slows brute-force)    │
+├─────────────────────────────────────────────┤
+│  Layer 4: Anti-Enumeration                  │
+│  (Same response regardless of existence)    │
+├─────────────────────────────────────────────┤
+│  Layer 5: Token Security                    │
+│  (Hash-only storage, rotation, reuse det.)  │
+└─────────────────────────────────────────────┘
+```
+
+**Key architectural decisions:**
+- **No secrets in client** — Flutter never sees Stripe secret key, refresh token raw values, or password hashes.
+- **Hash-only persistence** — refresh tokens, reset tokens, and verification tokens are all stored as `SHA256` hashes only. If the database is compromised, the attacker gets hashes, not usable tokens.
+- **Generic error responses** — `401 Unauthorized` is identical whether the password is wrong, the account is locked, or the email doesn't exist. This prevents user enumeration and credential stuffing reconnaissance.
+- **Transaction safety** — any security-critical multi-write operation (password change + session invalidation, reset + token consumption + session kill) happens in a single database transaction.
 
 ---
 

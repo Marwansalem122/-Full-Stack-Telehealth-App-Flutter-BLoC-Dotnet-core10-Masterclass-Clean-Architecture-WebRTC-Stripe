@@ -2,17 +2,20 @@
 
 **System Design Series · Document 3 of 4** (ERD → Architecture → **Sequence Diagrams** → API Contract)
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
-**Status:** v4 — aligned with Requirements Document v14 (fixed booking-retry logic bug, atomic/transactional webhook handling, StripeClientSecret resolved to not-persisted)
+**Status:** v5 — aligned with Requirements Document v15 and Security Deep-Dive Document 5. Added Auth/Security sequence diagrams (Forgot/Reset Password, Email Verification, Refresh Token Rotation & Reuse Detection).
 
 ---
 
 ## Why only three diagrams
 
-A Sequence Diagram isn't needed for every endpoint — only for flows with real decisions, branching, or timing complexity. The three flows below are the ones with actual complexity worth working out **before** writing code:
+A Sequence Diagram isn't needed for every endpoint — only for flows with real decisions, branching, or timing complexity. The flows below are the ones with actual complexity worth working out **before** writing code:
 
 1. **Booking → Payment → Confirmation** — transaction boundaries, concurrency, idempotency
 2. **WebRTC Call Establishment** — signaling vs. media, STUN/TURN fallback
 3. **Consultation → AI Summary** — async processing, retry, failure handling
+4. **Forgot / Reset Password** — anti-enumeration, token security, session invalidation
+5. **Email Verification** — registration flow, verification gate
+6. **Refresh Token Rotation & Reuse Detection** — rotation, family binding, theft detection
 
 ---
 
@@ -192,3 +195,185 @@ AI Summary:   [AISummary + AIJob=Completed] (1 TX) → SignalR
 ---
 
 **Next in the System Design series:** the full API Contract — endpoint list, request/response shapes, validation, authorization, and status codes, building directly on the flows above.
+
+
+---
+
+## 4. Forgot / Reset Password
+
+### 4.1 Forgot Password — Anti-Enumeration Flow
+
+```mermaid
+sequenceDiagram
+    participant F as Flutter
+    participant API as ASP.NET Core API
+    participant DB as SQL Server
+    participant MQ as Email Service (SendGrid/AWS SES)
+
+    F->>API: POST /auth/forgot-password { email }
+    API->>DB: SELECT User WHERE Email = ?
+    alt User exists AND EmailConfirmed = true
+        API->>DB: DELETE old unused tokens for this user
+        API->>API: Generate crypto-random token (256-bit)
+        API->>API: Hash token (SHA256)
+        API->>DB: INSERT PasswordResetToken (TokenHash, ExpiresAt = Now+1h)
+        API->>MQ: Send reset email (raw token in URL)
+        Note right of API: URL: /reset-password?token=RAW_TOKEN&email=user@example.com
+    else User does NOT exist OR EmailConfirmed = false
+        Note right of API: Do NOTHING — no DB write, no email
+    end
+    API-->>F: 200 OK { "message": "If this email exists..." }
+    Note right of F: نفس الرد تمامًا في الحالتين — لا يوجد طريقة للتمييز
+```
+
+**Key decisions locked:**
+- **Same response regardless of existence** — prevents user enumeration.
+- **Timing normalization** — the "not found" path may include a small random delay (50–150ms) so both paths take approximately the same time, preventing timing attacks.
+- **No email to unverified addresses** — prevents email bombing of arbitrary addresses.
+- **Token hashing** — only `SHA256(Token)` is persisted; raw token exists only in the user's email inbox.
+
+### 4.2 Reset Password — Session Kill
+
+```mermaid
+sequenceDiagram
+    participant F as Flutter
+    participant API as ASP.NET Core API
+    participant DB as SQL Server
+
+    F->>API: POST /auth/reset-password { token, email, newPassword }
+    API->>API: Hash incoming token (SHA256)
+    API->>DB: SELECT token WHERE TokenHash = ? AND User.Email = ?
+    alt Token not found OR expired OR already used
+        API-->>F: 400 Bad Request { "title": "Invalid or expired token" }
+    else Token valid
+        API->>API: Validate newPassword against policy
+        API->>DB: BEGIN TRANSACTION
+        API->>DB: UPDATE User.PasswordHash (ASP.NET Core Identity)
+        API->>DB: UPDATE PasswordResetToken SET IsUsed = true, UsedAt = Now
+        API->>DB: DELETE ALL RefreshTokens for this user
+        API->>DB: COMMIT
+        API-->>F: 200 OK { "message": "Password reset successful. Please log in." }
+    end
+```
+
+**Key decisions locked:**
+- **Single-use token** — `IsUsed` flag makes the token permanently invalid after first use.
+- **Post-reset nuclear option** — all `RefreshTokens` for the user are deleted, forcing re-login on all devices. This is a security-first decision: if the user forgot their password, we assume they may have been compromised.
+- **Transaction boundary** — password update + token consumption + session invalidation happen in one transaction. A crash can't leave the password updated but sessions still valid.
+
+---
+
+## 5. Email Verification
+
+```mermaid
+sequenceDiagram
+    participant F as Flutter
+    participant API as ASP.NET Core API
+    participant DB as SQL Server
+    participant MQ as Email Service
+
+    F->>API: POST /auth/register { email, password, role }
+    API->>API: Validate password policy
+    API->>API: Generate verification token (256-bit)
+    API->>API: Hash token (SHA256)
+    API->>DB: TRANSACTION:
+    Note right of DB: 1. INSERT User (EmailConfirmed = false)
+    Note right of DB: 2. INSERT Profile (Patient/Consultant)
+    Note right of DB: 3. Store EmailVerificationTokenHash
+    API->>DB: COMMIT
+    API->>MQ: Send verification email (raw token in link)
+    API-->>F: 201 Created { userId, emailConfirmed: false }
+    Note right of F: Flutter shows "Please verify your email" screen
+
+    F->>API: POST /auth/verify-email { email, token }
+    API->>API: Hash incoming token
+    API->>DB: SELECT User WHERE Email = ? AND TokenHash = ?
+    alt Token valid and not expired (24h)
+        API->>DB: UPDATE User SET EmailConfirmed = true, TokenHash = NULL
+        API-->>F: 200 OK { emailConfirmed: true }
+    else Token invalid/expired
+        API-->>F: 400 Bad Request
+    end
+```
+
+**Key decisions locked:**
+- **Verification gate** — `EmailConfirmed = false` blocks booking (`POST /appointments` returns `403`) and payment (implicitly, via booking block).
+- **Token storage** — `EmailVerificationTokenHash` on `Users` table (v1 minimal). v2 may split to a separate `EmailVerificationTokens` table for audit trail.
+- **Auto-send on registration** — no separate "send verification" step required; the email goes out automatically as part of the registration transaction.
+
+---
+
+## 6. Refresh Token Rotation & Reuse Detection
+
+### 6.1 Normal Rotation
+
+```mermaid
+sequenceDiagram
+    participant F as Flutter
+    participant API as ASP.NET Core API
+    participant DB as SQL Server
+
+    F->>API: POST /auth/refresh { refreshToken }
+    API->>API: Hash incoming token (SHA256)
+    API->>DB: SELECT token WHERE TokenHash = ? AND RevokedAt IS NULL AND ExpiresAt > Now
+    alt Token not found OR expired OR revoked
+        API-->>F: 401 Unauthorized (generic)
+    else Token valid
+        API->>API: Generate new crypto-random token
+        API->>API: Hash new token (SHA256)
+        API->>DB: BEGIN TRANSACTION
+        API->>DB: INSERT new RefreshToken (same FamilyId)
+        API->>DB: UPDATE old token: RevokedAt = Now, ReplacedByTokenId = newId, Reason = ReplacedByRotation
+        API->>DB: COMMIT
+        API->>API: Issue new JWT access token
+        API-->>F: 200 OK { accessToken, refreshToken: NEW_RAW, expiresIn: 3600 }
+    end
+```
+
+### 6.2 Reuse Detection — Theft Scenario
+
+```mermaid
+sequenceDiagram
+    participant Attacker as Attacker (stole old token)
+    participant Legit as Legitimate User
+    participant API as ASP.NET Core API
+    participant DB as SQL Server
+
+    Note over Attacker,Legit: Attacker tries to use a token that was already rotated
+    Attacker->>API: POST /auth/refresh { stolenOldToken }
+    API->>API: Hash token
+    API->>DB: SELECT token
+    API->>DB: Token found BUT RevokedAt IS NOT NULL (already rotated!)
+    API->>DB: BEGIN TRANSACTION
+    API->>DB: UPDATE token SET RevocationReason = ReuseDetected
+    API->>DB: DELETE ALL RefreshTokens WHERE FamilyId = thisFamily
+    API->>DB: COMMIT
+    API-->>Attacker: 401 Unauthorized (generic)
+
+    Note over Legit: Legitimate user tries to use their latest valid token
+    Legit->>API: POST /auth/refresh { hisValidToken }
+    API->>DB: Token found BUT family was wiped (ReuseDetected)
+    API-->>Legit: 401 Unauthorized (generic)
+    Note right of Legit: User forced to re-login — attacker is also blocked
+```
+
+**Key decisions locked:**
+- **Family binding** — all tokens from the same initial login share a `FamilyId`. This enables the "nuclear option": one detected reuse invalidates the entire family.
+- **Generic 401** — regardless of failure reason (expired, revoked, reuse detected), the response is identical. No information leakage to attackers.
+- **Token lifetime** — Refresh: 7 days. Access (JWT): 15 minutes.
+- **Cleanup** — Hosted BackgroundService deletes expired tokens (>30 days old) to prevent table bloat.
+
+---
+
+## Cross-cutting pattern: persist first, notify second (extended)
+
+All flows share the same shape at the end: **write to the database (as one transaction where multiple writes are involved), then notify** — never the reverse.
+
+```
+Booking:      [Payment=Paid + Appointment=Confirmed + Notification] (1 TX) → SignalR
+AI Summary:   [AISummary + AIJob=Completed] (1 TX) → SignalR
+Reset Password: [PasswordHash updated + Token marked used + RefreshTokens deleted] (1 TX) → HTTP 200
+Change Password: [PasswordHash updated + RefreshTokens deleted] (1 TX) → HTTP 200
+```
+
+`SignalR` / HTTP response is a **delivery mechanism**, not a source of truth — if the recipient is offline or the request fails, the underlying state change is still safely committed.

@@ -2,7 +2,7 @@
 
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
 **Owner:** Marwan
-**Status:** Draft v14 — fixed booking-retry logic bug, webhook made atomic/transactional, StripeClientSecret decision resolved, stale ERD-pending language removed, Next Steps updated
+**Status:** Draft v15 — added complete Security & Authentication Deep-Dive (Forgot/Reset Password, Email Verification, Change Password, Password Policy, Refresh Token Rotation/Reuse Detection, Account Lockout/Brute-force Protection). All five design documents are now mutually consistent.
 
 ---
 
@@ -26,11 +26,18 @@ A full-stack Telehealth platform that connects patients with medical consultants
 
 ### 3.1 Authentication & Profiles
 - As a Patient/Consultant, I want to register and log in securely, so that I can access the platform.
+- As a Patient/Consultant, I want to verify my email address during registration, so that the platform can trust my identity and I can recover my account.
+- As a Patient/Consultant, I want to reset my password if I forget it, so that I can regain access without admin intervention.
+- As a Patient/Consultant, I want to change my password while logged in, so that I can secure my account if I suspect compromise.
+- As a system, I want to enforce a strong password policy (minimum length, complexity, common-password rejection), so that weak passwords don't compromise accounts.
+- As a system, I want to lock accounts after repeated failed login attempts, so that brute-force attacks are ineffective.
+- As a system, I want to protect against user enumeration attacks (same response regardless of email existence), so that attackers can't build a user list.
 - As a Patient, I want to create and edit my profile (basic health info, contact details), so that consultants have context.
 - As a Consultant, I want to create a professional profile (specialty, bio, credentials, timezone), so that patients can evaluate me.
 - As a system, I want role-based authorization (Patient vs Consultant), so that each actor only accesses relevant endpoints.
 - As a system, I want to verify resource ownership on every request (not just authentication), so that Patient A can never access Patient B's data, and Consultant A can never access Consultant B's consultations.
 - As a system, I want a `ConsultantProfile.IsVerified` flag (default `false`), so that unverified consultants can complete their profile but do not appear in patient search until verified. *(v1: verification can be a manual DB update; no admin UI needed yet — the flag and the rule are what matter.)*
+- As a system, I want email verification to be mandatory before allowing bookings or payments, so that fake accounts can't abuse the platform.
 
 > **⚠️ Mutual exclusivity — a `User` must be a Patient XOR a Consultant, never both:** The ERD models `Users`→`ConsultantProfiles` and `Users`→`PatientProfiles` as two separate optional one-to-one relationships. That correctly stops a user from having *two* Consultant Profiles, but nothing in the relationship itself stops a user from having *both* a Consultant Profile *and* a Patient Profile — most RDBMS (including SQL Server) don't support a plain CHECK constraint spanning two different tables.
 > - **Primary enforcement (application layer):** `Users.Role` is set once at registration and treated as **immutable**. The `CreateConsultantProfile` command handler rejects the request unless `User.Role == Consultant`; `CreatePatientProfile` mirrors this for `Role == Patient`. As long as `Role` never changes after registration, this alone guarantees exclusivity.
@@ -319,7 +326,8 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
   - Stripe PaymentIntent creation must use an Idempotency-Key to avoid duplicate charges on client retry.
   - Background AI jobs must recover automatically after a server restart (see 3.5).
 - **Scalability:** SignalR is single-instance in v1; a Redis backplane is required only if scaling beyond one instance (see 3.4).
-- **Rate Limiting:** AI endpoints are rate-limited per user to control cost and load (see 3.5).
+- **Rate Limiting:** AI endpoints are rate-limited per user to control cost and load (see 3.5). Auth endpoints have tiered rate limiting (10/min for login, 3/min for registration, 3/hour for forgot-password) to prevent brute-force and enumeration attacks.
+- **Account Lockout:** After 5 consecutive failed login attempts, the account is locked for 15 minutes. Combined with generic error responses (no distinction between "wrong password" and "account locked"), this prevents credential stuffing and user enumeration.
 - **Caching:**
   - Consultant profile listings can be cached briefly (~5 minutes) since they change infrequently.
   - Available slots must **not** be cached beyond a few seconds (10–30s max), since they change with every booking — stale cached slots would cause booking conflicts.
@@ -402,7 +410,7 @@ None outstanding for v1 at this stage. Revisit if new architectural decisions co
 ## 10. ERD — Entities
 
 **Core:**
-- Users
+- Users *(+ `EmailConfirmed`, `EmailVerificationTokenHash`, `EmailVerificationSentAt`)*
 - ConsultantProfiles *(+ `TimeZoneId`, `IsVerified`, `ProfileImageUrl`)*
 - PatientProfiles
 - AvailabilitySlots
@@ -413,8 +421,10 @@ None outstanding for v1 at this stage. Revisit if new architectural decisions co
 - AISummaries *(`ConsultationId` UNIQUE — backstops the `0..1` cardinality against a retry-after-partial-failure race)*
 - AIJobs *(status, retries, provider, prompt version, errors, + `ProcessingStartedAt`, `ErrorDetails`)*
 - Notifications *(+ `IsRead`, `ReadAt`, `Data` JSON for deep links)*
-- RefreshTokens *(store `TokenHash`, never the raw token — see security note below)*
+- RefreshTokens *(store `TokenHash`, never the raw token — see security note below; + `FamilyId`, `ReplacedByTokenId`, `RevocationReason`, `RequestIpAddress`, `UserAgent` for rotation & reuse detection)*
 - StripeWebhookEvents *(`StripeEventId` UNIQUE — makes webhook idempotency concrete, see Section 3.3)*
+- PasswordResetTokens *(+ `TokenHash` UK, `IsUsed`, `UsedAt`, `RequestIpAddress`, `UserAgent` — same hash-only pattern as RefreshTokens)*
+- FailedLoginAttempts *(audit-only table for forensic analysis; lockout logic handled by ASP.NET Core Identity)*
 
 **Deferred to v2 (do not model yet):**
 - MedicalRecords
@@ -460,9 +470,10 @@ None outstanding for v1 at this stage. Revisit if new architectural decisions co
 1. ✅ ERD — finalized (entities, relationships, filtered unique indexes, `AppointmentStatus` vs. `Payment.Status` resolved)
 2. ✅ Architecture Diagram + Deployment Diagram — finalized
 3. ✅ Sequence Diagrams — finalized for the three complex flows (Booking → Payment → Confirmation, WebRTC call establishment, Consultation → AI Summary)
+4. ✅ API Contract — finalized (endpoint list, request/response shapes, validation, authorization, status codes, SignalR Hub contracts)
+5. ✅ Security & Authentication Deep-Dive — finalized (Forgot/Reset Password, Email Verification, Change Password, Password Policy, Refresh Token Security with Rotation & Reuse Detection, Account Lockout / Brute-force Protection)
 
 **Remaining before implementation:**
-4. Design the **API Contract** — endpoint list, request/response shapes, validation, authorization, and status codes, building directly on the finalized sequence diagrams.
-5. Design the **`IAIService` interface contract** — `AnalyzeSymptomsAsync` and `SummarizeConsultationAsync` signatures, input/output DTOs, and provider-agnostic abstractions. This is an internal implementation contract, not part of the public API surface.
-6. Decide the **chat encryption approach** (application-layer vs. SQL Server column-level encryption) before implementing `ChatMessage`.
-7. **Implementation** — begin coding against the finalized contracts above.
+6. Design the **`IAIService` interface contract** — `AnalyzeSymptomsAsync` and `SummarizeConsultationAsync` signatures, input/output DTOs, and provider-agnostic abstractions. This is an internal implementation contract, not part of the public API surface.
+7. Decide the **chat encryption approach** (application-layer vs. SQL Server column-level encryption) before implementing `ChatMessage`.
+8. **Implementation** — begin coding against the finalized contracts above.
