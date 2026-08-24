@@ -1,6 +1,6 @@
 # AI Telehealth Platform — Architecture Diagram (Detailed Reference)
 
-**System Design Series · Document 2 of 5** (ERD → **Architecture** → Sequence Diagrams → API Contract → Security Deep-Dive)
+**System Design Series · Document 2 of 5** (ERD → **Architecture** → Sequence Diagrams → API Contract → Security Deep-Dive)<br>**Updated:** Added Native SDK Layer (Kotlin/Android + Swift/iOS)
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
 
 ![Architecture Diagram](./architecture-diagram.png)
@@ -54,6 +54,65 @@ Response: confirmed or rejected
 This directly matches the booking concurrency rules already locked in the Requirements Document and ERD — the backend, not the client, is the single source of truth for whether a slot is actually available.
 
 > **Why one app with Flavors instead of two separate apps?** Both flavors share the same Clean Architecture codebase (domain, data, BLoC, SignalR client, API clients, models). The only difference is the entry point (`main_patient.dart` vs `main_consultant.dart`) and the presentation layer (screens, navigation). This eliminates code duplication, simplifies maintenance, and speeds up the MVP. Each flavor is built as a separate binary with its own `applicationId` and icon, so the stores treat them as distinct apps even though they share a single codebase.
+
+---
+
+## 3.5. Native SDK Layer (Kotlin / Swift)
+
+While Flutter owns the UI and business logic, the Telehealth app requires platform-native capabilities that Dart cannot access directly. This is not a separate app — it's a **native plugin layer** inside the same Flutter project, communicating via Platform Channels.
+
+```
+Flutter (Dart)
+    │
+    ├── MethodChannel / EventChannel
+    │
+    ├── Android (Kotlin)
+    │   ├── WebRTC media pipeline (Camera2 API)
+    │   ├── Android Keystore (hardware-backed encryption keys)
+    │   └── ConnectionService (background call handling)
+    │
+    └── iOS (Swift)
+        ├── WebRTC media pipeline (AVFoundation)
+        ├── Secure Enclave (hardware-backed encryption keys)
+        └── CallKit (incoming call UI integration)
+```
+
+### Why not pure Flutter?
+
+| Capability | Flutter Limitation | Native Solution |
+|---|---|---|
+| **Hardware video codecs** | `flutter_webrtc` uses software fallback for some codecs | Native Camera2/AVFoundation + hardware encoder |
+| **Hardware-backed encryption** | `flutter_secure_storage` wraps Keychain/Keystore but doesn't expose key generation | Native Keystore/Secure Enclave APIs for AES key generation |
+| **Background call UI** | Cannot show system-level incoming call screen | CallKit (iOS) / ConnectionService (Android) |
+| **Echo cancellation tuning** | Limited control | Native WebRTC audio processing APIs |
+
+### Communication Model
+
+```
+Flutter BLoC / UseCase
+    │
+    ▼
+Domain Interface (Dart)
+    │
+    ├── IWebRTCNativeService
+    ├── ISecureStorageNativeService
+    └── ICallKitNativeService
+    │
+    ▼
+Data Implementation (Dart)
+    │
+    ├── MethodChannel.invokeMethod()
+    └── EventChannel.receiveBroadcastStream()
+    │
+    ▼
+Native Plugin (Kotlin / Swift)
+    │
+    ├── WebRTC native library
+    ├── Android Keystore / iOS Keychain
+    └── OS Telephony Framework
+```
+
+**Critical rule:** Native code is a **capability provider**, not a decision maker. All business logic (when to start a call, what to encrypt, when to show incoming call UI) lives in Flutter's Domain Layer. Native code only executes what Flutter asks it to do.
 
 ---
 
@@ -182,7 +241,7 @@ The rest of the application only ever calls something like `GenerateSummary(...)
 
 ---
 
-## 10. Stripe (Payments)
+## 10. Stripe (Payments + Refunds)
 
 ```
 Flutter
@@ -192,19 +251,35 @@ ASP.NET Core
 Stripe
 ```
 
-Flutter never handles the Stripe secret key. The backend creates the PaymentIntent and returns only what the client needs (the client secret) to complete payment on its side. The webhook is what closes the loop:
+Flutter never handles the Stripe secret key. The backend creates the PaymentIntent and returns only what the client needs (the client secret) to complete payment on its side. The webhook is what closes the loop for both payments and refunds:
 
 ```
 Stripe
   |
-Webhook
+Webhook (payment_intent.succeeded)
   |
 ASP.NET Core
   |
-Update Payment status
+Update Payment.Status = Paid + Appointment.Status = Confirmed
 ```
 
-> This is the same rule already established in the Requirements Document: **the system never trusts the Flutter client's claim that a payment succeeded** — only the Stripe webhook is treated as the source of truth for payment confirmation.
+```
+Stripe
+  |
+Webhook (charge.refunded)
+  |
+ASP.NET Core
+  |
+Update Payment.RefundStatus = Succeeded + Payment.RefundedAt
+```
+
+> This is the same rule already established in the Requirements Document: **the system never trusts the Flutter client's claim that a payment succeeded** — only the Stripe webhook is treated as the source of truth for payment confirmation. The same principle applies to refunds: the API initiates the refund synchronously during cancellation, but the final confirmation comes via webhook.
+
+**Refund flow (v1):**
+- Cancellations >24h before appointment → automatic full refund via Stripe API
+- Cancellations <24h → no refund, payment kept
+- `Payment.RefundStatus` tracks: `None` → `Pending` (initiated) → `Succeeded` (webhook confirmed) / `Failed` (rare)
+- Earnings calculation excludes refunded payments
 
 ---
 
@@ -354,14 +429,17 @@ The goal for v1 is a **Production-Ready Modular Monolith** — a design that's n
 
 ```
 Flutter (Patient flavor / Consultant flavor)
-    |
+    │
+    ├── Dart Layer (UI, BLoC, Domain, API Client)
+    └── Native Layer (Kotlin/Swift — WebRTC, Crypto, CallKit)
+    │
 ASP.NET Core Modular Monolith
-    |
+    │
 SQL Server
-    |
+    │
 Background Worker
 
-  + SignalR, Stripe, WebRTC, AI Provider, Email Service (as needed)
+  + SignalR, Stripe, WebRTC Signaling, AI Provider, Email Service (as needed)
   + Redis (only once there's a real, present need for it)
 ```
 

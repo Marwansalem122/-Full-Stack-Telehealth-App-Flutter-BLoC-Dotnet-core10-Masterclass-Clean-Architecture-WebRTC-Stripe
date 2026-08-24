@@ -1,6 +1,6 @@
 # Telehealth Platform — Entity Relationship Diagram
 
-**Version:** v1.1 — Core entities + Supporting entities + Security entities
+**Version:** v1.4 — Core entities + Supporting entities + Security entities + Refund Flow + HealthProfile Value Object + No-Show Detection
 
 ```mermaid
 erDiagram
@@ -48,7 +48,13 @@ erDiagram
     PATIENT_PROFILES {
         guid Id PK
         guid UserId FK
-        string HealthInfo
+        int HeightCm
+        decimal WeightKg
+        string BloodType
+        string SmokingStatus
+        json Allergies
+        json ChronicConditions
+        json CurrentMedications
         string ContactDetails
     }
 
@@ -76,6 +82,8 @@ erDiagram
         guid AppointmentId FK
         datetime StartedAt
         datetime EndedAt
+        datetime PatientJoinedAt
+        datetime ConsultantJoinedAt
         int DurationMinutes
         string Status
     }
@@ -86,10 +94,13 @@ erDiagram
         decimal Amount
         string Currency
         string StripePaymentIntentId
+        string StripeRefundId
         string IdempotencyKey
         string Status
+        string RefundStatus
         datetime CreatedAt
         datetime PaidAt
+        datetime RefundedAt
     }
 
     CHAT_MESSAGES {
@@ -205,3 +216,43 @@ Same security pattern as `RefreshTokens`: raw token never stored; only `SHA256(T
 Audit-only table (not used for lockout logic — that is handled by ASP.NET Core Identity).
 - `EmailAttempted` → the email string submitted (may not exist in `Users`).
 - `IpAddress` / `UserAgent` / `AttemptedAt` / `WasSuccessful` → forensic data for v2 alerting rules.
+
+
+---
+
+### `PatientProfiles` — HealthProfile Value Object (added v1.3)
+
+Replaced the v1.2 `HealthInfo` string field with a structured Value Object. This is an **owned entity** (not a separate table) — stored as JSON columns or via EF Core `OwnsOne` / `ToJson()`.
+
+**Fields:**
+- `HeightCm` → nullable int, validated range 50–300 cm
+- `WeightKg` → nullable decimal, validated range 2–500 kg
+- `BloodType` → enum: `Unknown`, `APositive`, `ANegative`, `BPositive`, `BNegative`, `ABPositive`, `ABNegative`, `OPositive`, `ONegative`
+- `SmokingStatus` → enum: `Unknown`, `Never`, `Former`, `Current`
+- `Allergies` → JSON array of strings (e.g., `["Penicillin", "Peanuts"]`)
+- `ChronicConditions` → JSON array of strings (e.g., `["Hypertension", "Type 2 Diabetes"]`)
+- `CurrentMedications` → JSON array of strings (e.g., `["Metformin 500mg", "Lisinopril 10mg"]`)
+
+**Why not a string?**
+- Enables validation (range checks, enum constraints)
+- Enables querying ("find all patients with diabetes")
+- Enables structured AI context for consultation summaries
+- Enables clean Flutter form UI (separate fields, not a text blob)
+
+**All fields are nullable** — patients are not required to provide health data, but when they do it must be structured and valid.
+
+
+### `Consultations` — No-Show Detection Fields (added v1.4)
+
+Added two nullable timestamp fields to support automatic no-show detection:
+
+- `PatientJoinedAt` → set when the patient successfully calls `JoinCall` (SignalR hub method). Null if patient never joined.
+- `ConsultantJoinedAt` → set when the consultant successfully calls `JoinCall`. Null if consultant never joined.
+- `StartedAt` → set when the *first* participant joins (call transitions to `InProgress`). Null if call never started.
+
+**No-show evaluation (BackgroundService, 15 minutes after `ScheduledStartUtc`):**
+- `StartedAt IS NULL` + `PatientJoinedAt IS NULL` + `ConsultantJoinedAt HAS VALUE` → **Patient no-show**
+- `StartedAt IS NULL` + `PatientJoinedAt HAS VALUE` + `ConsultantJoinedAt IS NULL` → **Consultant no-show**
+- `StartedAt IS NULL` + both null → **Mutual no-show**
+
+These fields enable the refund policy (§3.2.1) to be applied automatically without manual intervention.

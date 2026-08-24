@@ -1,8 +1,8 @@
 # AI Telehealth Platform — Requirements Document
 
-**Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
+**Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC) + Native SDK Layer (Kotlin/Android, Swift/iOS via Platform Channels)
 **Owner:** Marwan
-**Status:** Draft v15 — added complete Security & Authentication Deep-Dive (Forgot/Reset Password, Email Verification, Change Password, Password Policy, Refresh Token Rotation/Reuse Detection, Account Lockout/Brute-force Protection). All five design documents are now mutually consistent.
+**Status:** Draft v18 — replaced PatientProfiles.HealthInfo string with HealthProfile structured value object (height, weight, blood type, allergies, chronic conditions, medications) (consultant/patient cancellation >24h triggers Stripe refund, earnings exclude refunded payments) (Kotlin/Android + Swift/iOS via Platform Channels), updated Architecture and Sequence Diagrams (Forgot/Reset Password, Email Verification, Change Password, Password Policy, Refresh Token Rotation/Reuse Detection, Account Lockout/Brute-force Protection). All five design documents are now mutually consistent.
 
 ---
 
@@ -32,7 +32,8 @@ A full-stack Telehealth platform that connects patients with medical consultants
 - As a system, I want to enforce a strong password policy (minimum length, complexity, common-password rejection), so that weak passwords don't compromise accounts.
 - As a system, I want to lock accounts after repeated failed login attempts, so that brute-force attacks are ineffective.
 - As a system, I want to protect against user enumeration attacks (same response regardless of email existence), so that attackers can't build a user list.
-- As a Patient, I want to create and edit my profile (basic health info, contact details), so that consultants have context.
+- As a Patient, I want to create and edit my health profile (height, weight, blood type, allergies, chronic conditions, current medications), so that consultants have structured, actionable context.
+- As a Patient, I want to update my contact details, so that the platform and consultants can reach me.
 - As a Consultant, I want to create a professional profile (specialty, bio, credentials, timezone), so that patients can evaluate me.
 - As a system, I want role-based authorization (Patient vs Consultant), so that each actor only accesses relevant endpoints.
 - As a system, I want to verify resource ownership on every request (not just authentication), so that Patient A can never access Patient B's data, and Consultant A can never access Consultant B's consultations.
@@ -53,6 +54,8 @@ A full-stack Telehealth platform that connects patients with medical consultants
 - As a system, I want `POST /appointments` itself to accept a client-generated **Idempotency-Key** header, so that a lost response (network dies after the appointment is created but before Flutter receives the ID) can't cause the client to accidentally create a second appointment on retry.
 - As a Consultant, I want to see my upcoming appointments, so that I can prepare.
 - As a Patient/Consultant, I want to cancel or reschedule an appointment (basic rules only), so that plans can change.
+- As a Patient/Consultant, I want an automatic refund when I cancel more than 24 hours before the appointment, so that I'm not charged for appointments I couldn't attend.
+- As a Consultant, I want cancelled appointments (by either party) to be automatically refunded when eligible, so that patients trust the platform and my earnings reflect only completed consultations.
 
 **Appointment Lifecycle** — modeled as an `AppointmentStatus` enum from day one. **Finalized** (see rationale below — `Paid` is not part of this enum):
 
@@ -66,6 +69,93 @@ Confirmed      → NoShow
 ```
 
 > **✅ Resolved: no separate `Paid` status on Appointment.** `Payment.Status` (Section 3.3) is the single source of truth for payment state. The Stripe webhook confirming `Payment.Status = Paid` transitions the Appointment directly to `Confirmed` in the same step — there is exactly one place that answers "was this paid," not two states that could drift out of sync.
+>
+> **✅ Resolved: refund flow for v1.** When a `Confirmed` appointment is cancelled more than 24 hours before the scheduled time, the system automatically initiates a Stripe refund. `Payment.RefundStatus` tracks the refund lifecycle (`None` → `Pending` → `Succeeded`/`Failed`). The Stripe `charge.refunded` webhook updates `RefundStatus = Succeeded` and `RefundedAt`. Cancellations within 24h do not trigger refunds (payment is kept). This rule applies equally to patient-initiated and consultant-initiated cancellations.
+
+### 3.2.1 Refund Policy — Explicit Rules
+
+The following table is the single source of truth for when a refund is issued. This is a **business rule**, not an implementation detail.
+
+| Scenario | Who Cancels | Refund? | Reason |
+|---|---|---|---|
+| Cancel > 24h before appointment | Patient | ✅ **Full refund** | Enough notice given |
+| Cancel > 24h before appointment | Consultant | ✅ **Full refund** | Enough notice given |
+| Cancel ≤ 24h before appointment | Patient | ❌ **No refund** | Late cancellation penalty |
+| Cancel ≤ 24h before appointment | Consultant | ❌ **No refund** | Late cancellation penalty |
+| No-show (patient never joins) | System (auto) | ❌ **No refund** | Patient forfeits payment |
+| No-show (consultant never joins) | System (auto) | ✅ **Full refund** | Consultant at fault |
+| Appointment completed successfully | — | ❌ **No refund** | Service delivered |
+
+**Key principles:**
+- **Symmetry:** Patient and consultant have identical cancellation rights. Neither party is privileged.
+- **24-hour window:** The cutoff is strict. `ScheduledStartUtc - 24h` is the boundary; one minute over = no refund.
+- **No partial refunds:** v1 only supports full refund or no refund. Partial refunds (e.g., 50%) are deferred to v2.
+- **Refund initiation is synchronous:** The Stripe API call happens during the `POST /appointments/{id}/cancel` request. The user receives `RefundStatus = Pending` immediately.
+- **Refund confirmation is asynchronous:** The actual money movement is confirmed by Stripe webhook (`charge.refunded`). This may take minutes to hours depending on the payment method and Stripe processing.
+- **Earnings exclusion:** `GET /consultants/me/earnings` excludes all payments where `RefundStatus = Succeeded`. A refunded appointment never counts as income.
+
+### 3.2.2 No-Show Detection — Background Job
+
+> **⚠️ Critical gap closed:** The `NoShow` status in the `AppointmentStatus` enum was previously undefined — no trigger condition was specified. The following rules are now the single source of truth for no-show detection.
+
+**Grace period:** 15 minutes after `ScheduledStartUtc`. If the call has not started by then, the system evaluates no-show.
+
+**Detection mechanism:**
+1. `JoinCall` SignalR hub method records a timestamp on the `Consultation` entity:
+   - `Consultation.PatientJoinedAt` — set when the patient calls `JoinCall`
+   - `Consultation.ConsultantJoinedAt` — set when the consultant calls `JoinCall`
+   - `Consultation.StartedAt` — set when the *first* participant successfully joins (i.e., the call transitions to `InProgress`)
+2. A `Hosted BackgroundService` (`NoShowDetectionService`) runs every 5 minutes.
+3. It queries: `Appointments` where `Status = Confirmed` AND `ScheduledStartUtc + 15 minutes <= Now` AND `Consultation.StartedAt IS NULL`.
+4. For each qualifying appointment, it determines fault:
+
+| `PatientJoinedAt` | `ConsultantJoinedAt` | Fault | `Appointment.Status` | Refund? |
+|---|---|---|---|---|
+| Null | Has value | **Patient no-show** | `NoShow` | ❌ No refund |
+| Has value | Null | **Consultant no-show** | `NoShow` | ✅ Full refund |
+| Null | Null | **Mutual no-show** | `NoShow` | ❌ **No refund — patient forfeits** |
+| Has value | Has value | *Should not happen* — `StartedAt` would be set | — | — |
+
+**Actions taken by the background job (single transaction):**
+1. `Appointment.Status = NoShow`
+2. `Consultation.Status = PatientNoShow` / `ConsultantNoShow` / `MutualNoShow`
+3. Create `Notification` for both parties ("You were marked as no-show for your appointment at ...")
+4. If consultant no-show: initiate Stripe refund (`Payment.RefundStatus = Pending`, call Stripe API)
+5. Commit
+
+#### Mutual No-Show — Explicit Decision
+
+> **⚠️ This is a deliberate v1 decision, not a gap.**
+
+When **neither** party joins the call within 15 minutes, the system does **not** leave the appointment in an ambiguous state. The rule is definitive:
+
+```
+Mutual No-Show → Appointment.Status = NoShow, Payment kept (no refund)
+```
+
+**Why patient forfeits (not split, not platform liability):**
+- v1 has **no partial refund support** — only full refund or no refund.
+- The consultant did not fail alone (they also didn't join), so they don't qualify for the "consultant no-show = refund" rule.
+- The patient did not fail alone (they also didn't join), so they don't qualify for the "patient no-show = forfeit" rule as a clear-cut case.
+- In the absence of a clear fault, **the party that paid (patient) bears the loss**. This is the simplest, most defensible rule for v1.
+- The platform never absorbs the cost in v1 — no "platform liability" concept exists yet.
+
+**If this feels unfair:** that's a v2 concern. v2 can introduce:
+- Partial refunds (e.g., 50/50 split)
+- Platform credit/voucher for mutual no-shows
+- Admin review of mutual no-shows
+- Reputation penalties for both parties
+
+But v1 must have a **deterministic rule** — not a hanging state. The background job commits `MutualNoShow` + no refund immediately.
+
+**Late join protection:**
+- If `Appointment.Status = NoShow`, `JoinCall` rejects with `409 Conflict` ("This appointment has been marked as no-show and cannot be joined").
+- This prevents a participant from joining 20 minutes late and confusing the state.
+
+**Why 15 minutes?**
+- Short enough to resolve the appointment promptly (patient isn't left waiting indefinitely).
+- Long enough to account for minor delays (network issues, app startup time, notification delay).
+- v1 decision — adjustable in v2 based on analytics.
 
 > **✅ Resolved: booking concurrency.** The v1 decision is finalized: **filtered unique indexes**, not optimistic locking:
 > - `UNIQUE (ConsultantId, ScheduledStartUtc) WHERE Status NOT IN (Cancelled, NoShow, PaymentFailed)` on the `Appointments` table, so a duplicate insert for an *active* booking fails at the DB level, while a cancelled appointment never blocks the slot.
@@ -93,7 +183,7 @@ Confirmed      → NoShow
 - As a system, I want to create a Stripe PaymentIntent when a booking starts, so that payment can be tracked end-to-end.
 - As a system, I want to verify payment success **only via Stripe Webhooks** (never trust the Flutter client's claim that payment succeeded), so that appointment status updates reliably and securely.
 - As a system, I want to send an **Idempotency-Key** on the Stripe PaymentIntent creation call — the *same* key as `Appointment.IdempotencyKey` (Section 3.2), not a separately generated one — so that a network retry from the client can't create a duplicate PaymentIntent.
-- As a Consultant, I want to see my earnings/payout summary, so that I can track income.
+- As a Consultant, I want to see my earnings/payout summary (excluding refunded appointments), so that I can track actual income.
 
 **Payment flow — ordering matters (Stripe calls should not sit inside a DB transaction, since the API call can be slow and would hold a connection/lock):**
 ```
@@ -332,6 +422,7 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
   - Consultant profile listings can be cached briefly (~5 minutes) since they change infrequently.
   - Available slots must **not** be cached beyond a few seconds (10–30s max), since they change with every booking — stale cached slots would cause booking conflicts.
 - **Auditability (lightweight in v1, full audit trail in v2):** Core entities carry `CreatedAt`/`ModifiedAt` and support soft deletes from v1, so a full `AuditLog` (EntityType, EntityId, Action, UserId, Timestamp, Changes) can be added later without restructuring existing tables.
+- **Health Data Structure:** `PatientProfile.HealthProfile` is a structured Value Object (not free-text). All fields are optional (nullable) to respect patient privacy, but when provided they are validated (e.g., height 50–300cm, weight 2–500kg) and stored in a queryable format (JSON columns or owned entity).
 - **Maintainability:** Backend follows Clean Architecture (Data/Application/Domain/Presentation) with CQRS/MediatR, consistent with existing project conventions.
 
 ---
@@ -348,6 +439,7 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
 - AI Symptom Checker (via `IAIService` abstraction, structured output, rate-limited)
 - AI Consultation Summary — chat-based, async pipeline with transactional job creation and DB polling, retry/failure handling and restart recovery
 - Basic in-app notifications (SignalR)
+- Native SDK Layer (Kotlin/Swift) for WebRTC media pipeline, secure storage, and background call handling
 
 **Later (v2+):**
 - Admin dashboard / analytics / user management (including a UI for consultant verification)
@@ -373,7 +465,7 @@ Explicitly *not* building initially:
 
 - [ ] Multi-language support
 - [ ] Admin dashboard / analytics
-- [ ] Complex refund/cancellation policies
+- [x] ~~Complex refund/cancellation policies~~ — **MOVED TO v1** (simple auto-refund >24h before appointment)
 - [ ] Group video calls (one-to-one only)
 - [ ] Insurance/claims integration
 - [ ] Push notifications (FCM) — in-app only via SignalR for v1
@@ -383,16 +475,141 @@ Explicitly *not* building initially:
 
 ---
 
+## 7.5. Native SDK Layer — Flutter + Platform Channels
+
+> **⚠️ This is a v1 addition, not a v2 deferral.** The decision to add a native SDK layer was made after the initial System Design series was complete, based on the specific needs of a Telehealth app (real-time media, secure storage, background call handling).
+
+### Why native?
+
+Flutter is excellent for UI and business logic, but a Telehealth app has three areas where native code provides critical advantages:
+
+1. **WebRTC Media Pipeline** — `flutter_webrtc` abstracts the basics, but for production-grade video calls, direct control over camera capture, hardware encoding/decoding, and echo cancellation via native APIs (Camera2 on Android, AVFoundation on iOS) provides better performance and battery life.
+2. **Secure Storage** — While `flutter_secure_storage` wraps Keychain/Keystore, a native SDK layer allows us to implement application-layer encryption for chat messages using platform-specific crypto APIs (Android Keystore System, iOS Secure Enclave) with hardware-backed keys where available.
+3. **Background Call Handling** — Incoming calls must surface as system-level call UI (CallKit on iOS, ConnectionService/TelecomManager on Android). This is impossible from pure Flutter; it requires native services that bind to the OS telephony framework.
+
+### Architecture — How it fits Clean Architecture
+
+The native layer does **not** replace Flutter's Clean Architecture; it extends the Data Layer:
+
+```
+┌─────────────────────────────────────────────┐
+│  Presentation Layer (Flutter UI + BLoC)     │
+├─────────────────────────────────────────────┤
+│  Domain Layer (UseCases, Entities)          │  ← 100% Dart, zero native deps
+├─────────────────────────────────────────────┤
+│  Data Layer                                   │
+│  ├── API Repositories (Dio)                 │
+│  ├── Local Repositories (Hive/Drift)        │
+│  └── Native Repositories                    │  ← PlatformChannel → Kotlin/Swift
+│      ├── WebRTCNativeService                │
+│      ├── SecureStorageNativeService         │
+│      └── CallKitConnectionService           │
+└─────────────────────────────────────────────┘
+```
+
+**Rules:**
+- Domain Layer defines interfaces (`IWebRTCNativeService`, `ISecureStorageService`).
+- Data Layer implements them via `MethodChannel` / `EventChannel`.
+- Native code (Kotlin/Swift) lives in `android/src/main/kotlin/...` and `ios/Runner/...` — standard Flutter plugin structure, but inline within the app (not a published plugin).
+- No business logic in native code — native is a "dumb pipe" for platform capabilities. All decisions (when to start a call, what to encrypt) are made in Dart Domain Layer.
+
+### Communication Pattern
+
+```dart
+// Dart side (Data Layer)
+class WebRTCNativeService implements IWebRTCNativeService {
+  static const platform = MethodChannel('com.telehealth.webrtc');
+
+  @override
+  Future<void> initializeLocalStream() async {
+    await platform.invokeMethod('initializeLocalStream', {
+      'videoEnabled': true,
+      'audioEnabled': true,
+      'facingMode': 'user',
+    });
+  }
+}
+```
+
+```kotlin
+// Android side (Kotlin)
+class WebRTCNativePlugin : FlutterPlugin, MethodCallHandler {
+    override fun onMethodCall(call: MethodCall, result: Result) {
+        when (call.method) {
+            "initializeLocalStream" -> {
+                val videoEnabled = call.argument<Boolean>("videoEnabled") ?: true
+                // Use Camera2 API + WebRTC native library
+                nativeWebRTC.initialize(videoEnabled)
+                result.success(null)
+            }
+        }
+    }
+}
+```
+
+```swift
+// iOS side (Swift)
+class WebRTCNativePlugin: NSObject, FlutterPlugin {
+    static func register(with registrar: FlutterPluginRegistrar) {
+        let channel = FlutterMethodChannel(name: "com.telehealth.webrtc", binaryMessenger: registrar.messenger())
+        let instance = WebRTCNativePlugin()
+        registrar.addMethodCallDelegate(instance, channel: channel)
+    }
+
+    func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+        switch call.method {
+        case "initializeLocalStream":
+            let args = call.arguments as! [String: Any]
+            let videoEnabled = args["videoEnabled"] as? Bool ?? true
+            // Use AVFoundation + WebRTC native framework
+            nativeWebRTC.initialize(video: videoEnabled)
+            result(nil)
+        }
+    }
+}
+```
+
+### What goes native vs. what stays Flutter
+
+| Concern | Flutter (Dart) | Native (Kotlin/Swift) |
+|---|---|---|
+| UI Screens / Navigation | ✅ | ❌ |
+| State Management (BLoC) | ✅ | ❌ |
+| API Calls (REST/SignalR) | ✅ | ❌ |
+| Business Logic / Validation | ✅ | ❌ |
+| Camera capture / Video encoding | ⚠️ (flutter_webrtc) | ✅ (direct Camera2/AVFoundation) |
+| Hardware crypto (Secure Enclave/Keystore) | ❌ | ✅ |
+| Background audio / CallKit | ❌ | ✅ |
+| Picture-in-Picture video | ⚠️ | ✅ |
+| File I/O / Local DB | ✅ | ❌ |
+
+### v1 Scope for Native Layer
+
+**In scope (v1):**
+- `SecureStorageService` — hardware-backed key storage for chat encryption keys + refresh token secure storage
+- `WebRTCNativeService` — camera/audio initialization, hardware codec selection, echo cancellation tuning
+- `CallKitService` (iOS) / `ConnectionService` (Android) — incoming call UI integration with OS
+
+**Deferred to v2:**
+- Native video recording / screenshot prevention (DRM-like)
+- Advanced noise suppression (RNNoise native integration)
+- Native haptics for call notifications
+
+---
+
 ## 8. Decisions Made
 
 - **AI Provider:** `Microsoft.Extensions.AI` as the abstraction layer, with **OpenAI** as the concrete provider behind it in v1. This teaches the abstraction pattern while still exercising a real provider integration.
-- **Cancellation Policy (v1):** Simple fixed rule — e.g., free cancellation up to 24h before the appointment; no cancellation/penalty logic beyond that. Refine in v2 if needed.
+- **Cancellation Policy (v1):** Simple fixed rule — free cancellation up to 24h before the appointment with **automatic full refund**; cancellations within 24h of the appointment time are not refunded (the payment is kept). This applies equally whether the patient or consultant initiates the cancellation. Refund is processed via Stripe and confirmed by webhook.
 - **Pricing Model (v1):** Flat consultation price across all consultants (no per-specialty or per-consultant variable pricing yet).
 - **STUN/TURN Provider:** Google's public STUN server for v1 (free, sufficient for learning NAT traversal). Add a self-hosted **coturn** TURN server as a follow-up step to also learn the relay/infrastructure side.
 - **Background Job Execution (v1):** No message queue or Hangfire yet — start with the simplest reliable pattern (Hosted BackgroundService + persisted `AIJob` state, see 3.5). Once understood end-to-end, optionally build a second version using Hangfire or a message broker to compare trade-offs — a deliberate v2 learning exercise, not a v1 requirement.
 - **Consultant Verification (v1):** `IsVerified` boolean, manually flipped in the database for now — no admin UI needed until v2.
 - **AI Summary cardinality — one final summary per consultation in v1:** `Consultation → 0..1 AISummary` is a deliberate decision, not just a default cardinality. `AIJob` already models retries as a single row with an incrementing `RetryCount` (not one row per attempt), so only the successful attempt ever persists an `AISummary`. If a future version needs to keep a history of summaries across different prompt versions or providers (true versioning, not retry), this relationship would need to change to `Consultation → 0..* AISummary` with an `IsCurrent`/`GeneratedAt` marker to identify the latest — that's an explicit v2 schema change, not something v1 needs to accommodate now.
 - **RefreshToken fields (v1 minimal set):** `UserId`, `TokenHash`, `ExpiresAt`, `CreatedAt`, `RevokedAt` — sufficient for v1. Richer fields (`DeviceId`, `UserAgent`, `IpAddress`, `RevokedReason`) are useful for multi-device session management and audit trails, but are a deliberate v2 addition, not required to ship v1 securely.
+- **Native SDK Layer:** ✅ Added as v1 component. Flutter handles UI + business logic; Kotlin (Android) and Swift (iOS) handle platform-specific capabilities (WebRTC media pipeline, hardware crypto, CallKit/ConnectionService) via Platform Channels. Domain Layer remains 100% Dart with interface abstractions.
+- **Patient Health Data Model:** ✅ Finalized — `HealthProfile` is a structured Value Object (not a `string`). Contains: `HeightCm`, `WeightKg`, `BloodType` (enum), `SmokingStatus` (enum), `Allergies`/`ChronicConditions`/`CurrentMedications` (JSON lists). Stored as an owned entity / JSON column in SQL Server. This enables validation, querying, structured AI context, and clean UI rendering. A `string` field was rejected as an anti-pattern for medical data.
+- **Refund Flow (v1):** ✅ Finalized — automatic full refund for cancellations >24h before appointment via Stripe API + webhook confirmation. `Payment.RefundStatus` tracks lifecycle. Cancellations <24h are not refunded. Earnings endpoint excludes refunded payments.
 - **Booking Concurrency Control:** ✅ Finalized (see Section 3.2 and the Sequence Diagrams document) — **filtered unique indexes**, not optimistic locking:
   ```sql
   UNIQUE (ConsultantId, ScheduledStartUtc) WHERE Status NOT IN (Cancelled, NoShow, PaymentFailed)
@@ -412,11 +629,11 @@ None outstanding for v1 at this stage. Revisit if new architectural decisions co
 **Core:**
 - Users *(+ `EmailConfirmed`, `EmailVerificationTokenHash`, `EmailVerificationSentAt`)*
 - ConsultantProfiles *(+ `TimeZoneId`, `IsVerified`, `ProfileImageUrl`)*
-- PatientProfiles
+- PatientProfiles *(+ `HealthProfile` value object: `HeightCm`, `WeightKg`, `BloodType`, `SmokingStatus`, `Allergies` [JSON], `ChronicConditions` [JSON], `CurrentMedications` [JSON]) — replaces v17 `HealthInfo` string*
 - AvailabilitySlots
 - Appointments *(+ `CancellationReason`, `CancelledAt`, `IdempotencyKey` UNIQUE — see booking idempotency note in Section 3.2)*
 - Consultations
-- Payments *(+ `IdempotencyKey`; `StripeClientSecret` deliberately NOT persisted — see Section 3.3)*
+- Payments *(+ `IdempotencyKey`, `StripeRefundId`, `RefundStatus` [None/Pending/Succeeded/Failed], `RefundedAt`; `StripeClientSecret` deliberately NOT persisted — see Section 3.3)*
 - ChatMessages *(+ `MessageType`, encrypted `Content`)*
 - AISummaries *(`ConsultationId` UNIQUE — backstops the `0..1` cardinality against a retry-after-partial-failure race)*
 - AIJobs *(status, retries, provider, prompt version, errors, + `ProcessingStartedAt`, `ErrorDetails`)*

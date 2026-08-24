@@ -2,7 +2,7 @@
 
 **System Design Series · Document 4 of 4** (ERD → Architecture → Sequence Diagrams → **API Contract**)
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
-**Status:** v4 — added complete Auth/Security endpoints (Forgot/Reset Password, Email Verification, Change Password, Password Policy), aligned with Security Deep-Dive Document 5.
+**Status:** v6 — replaced PatientProfiles.HealthInfo string with structured HealthProfile value object (height, weight, blood type, allergies, chronic conditions, medications) (cancellation >24h triggers Stripe refund, confirmed by webhook; earnings exclude refunded payments) (Forgot/Reset Password, Email Verification, Change Password, Password Policy), aligned with Security Deep-Dive Document 5.
 
 ---
 
@@ -186,7 +186,7 @@ Content-Type: application/json
 
 ### 3.2 `POST /webhooks/stripe`
 
-Implements Sequence Diagrams, Document 3, Diagram 1 (webhook portion). **Not a normal client endpoint** — called by Stripe, authenticated via signature, not JWT.
+Implements Sequence Diagrams, Document 3, Diagram 1 (webhook portion) **and** refund confirmation. **Not a normal client endpoint** — called by Stripe, authenticated via signature, not JWT.
 
 **Headers:**
 ```
@@ -199,8 +199,9 @@ Content-Type: application/json
 **Behavior:**
 1. Verify `Stripe-Signature` against the raw body. Invalid signature → `400`, event discarded, nothing written.
 2. Attempt `INSERT` into `StripeWebhookEvents` with the event's `StripeEventId`. Constraint violation → event already processed → `200` immediately, no further action.
-3. New event → single transaction: `Payment.Status = Paid`, `Appointment.Status = Confirmed`, create `Notification`. Commit.
-4. SignalR broadcast to the patient, after commit.
+3. New event → process based on event type:
+   - **`payment_intent.succeeded`**: single transaction: `Payment.Status = Paid`, `Appointment.Status = Confirmed`, create `Notification`. Commit. SignalR broadcast to patient.
+   - **`charge.refunded`**: single transaction: `Payment.RefundStatus = Succeeded`, `Payment.RefundedAt = Now`, create `Notification` (to patient: "Your refund has been processed"). Commit. SignalR broadcast to patient.
 
 **Response — `200 OK`** in all "handled" cases (including duplicates) — Stripe interprets anything other than `2xx` as "redeliver later," which is only desired for genuine processing failures, not duplicates.
 ```json
@@ -404,7 +405,63 @@ Flutter calls this on registration/change-password screens to display requiremen
 
 ### Profiles
 
-**`GET /patients/me`** / **`PUT /patients/me`** — standard profile read/update, resource ownership implicit (`me`).
+**`GET /patients/me`**
+```json
+// Response 200
+{
+  "userId": "...",
+  "healthProfile": {
+    "heightCm": 175,
+    "weightKg": 70.5,
+    "bloodType": "APositive",
+    "smokingStatus": "Never",
+    "allergies": ["Penicillin", "Peanuts"],
+    "chronicConditions": ["Hypertension"],
+    "currentMedications": ["Lisinopril 10mg"],
+    "bmi": 23.0
+  },
+  "contactDetails": "+20 123 456 7890"
+}
+```
+`healthProfile` may be `null` if the patient has not provided health data yet. `bmi` is computed server-side from `heightCm` and `weightKg` when both are present.
+
+**`PUT /patients/me`**
+```json
+// Request
+{
+  "healthProfile": {
+    "heightCm": 175,
+    "weightKg": 70.5,
+    "bloodType": "APositive",
+    "smokingStatus": "Never",
+    "allergies": ["Penicillin", "Peanuts"],
+    "chronicConditions": ["Hypertension"],
+    "currentMedications": ["Lisinopril 10mg"]
+  },
+  "contactDetails": "+20 123 456 7890"
+}
+
+// Response 200
+{
+  "userId": "...",
+  "healthProfile": { /* ... */ },
+  "contactDetails": "+20 123 456 7890"
+}
+```
+**Validation rules:**
+
+| Field | Rule |
+|---|---|
+| `healthProfile.heightCm` | Optional. If provided, must be 50–300. |
+| `healthProfile.weightKg` | Optional. If provided, must be 2.0–500.0. |
+| `healthProfile.bloodType` | Optional. Enum: `Unknown`, `APositive`, `ANegative`, `BPositive`, `BNegative`, `ABPositive`, `ABNegative`, `OPositive`, `ONegative`. |
+| `healthProfile.smokingStatus` | Optional. Enum: `Unknown`, `Never`, `Former`, `Current`. |
+| `healthProfile.allergies` | Optional. Array of strings. Max 50 items. Each item max 100 chars. |
+| `healthProfile.chronicConditions` | Optional. Array of strings. Max 50 items. Each item max 100 chars. |
+| `healthProfile.currentMedications` | Optional. Array of strings. Max 50 items. Each item max 200 chars. |
+| `contactDetails` | Optional. Max 500 chars. |
+
+**Behavior:** `PUT` replaces the entire `healthProfile` object (same full-replace semantics as other v1 endpoints). Sending `healthProfile: null` clears all health data. Sending `healthProfile: {}` with all nulls keeps the object but clears all fields.
 
 **`GET /consultants/me`** / **`PUT /consultants/me`** — same pattern. `IsVerified` is **read-only** via this endpoint — it's only ever flipped by direct DB update in v1 (Requirements §3.1), never through a client-facing field.
 
@@ -450,10 +507,11 @@ Replaces the full weekly schedule (simplest correct semantics for v1 — no part
   "totalEarnings": 1500.00,
   "currency": "USD",
   "completedPaidConsultations": 10,
+  "refundedConsultations": 2,
   "pendingPayout": 500.00
 }
 ```
-Aggregates from `Payments` where `Status = Paid` and the associated appointment's consultant is the caller. `pendingPayout` counts completed consultations whose payment is still in Stripe's hold period (exact payout timing is a Stripe/platform detail, not a v1 design concern).
+Aggregates from `Payments` where `Status = Paid` AND (`RefundStatus IS NULL` OR `RefundStatus != Succeeded`) and the associated appointment's consultant is the caller. **Refunded appointments are excluded from earnings.** `refundedConsultations` counts appointments that were paid then refunded. `pendingPayout` counts completed consultations whose payment is still in Stripe's hold period (exact payout timing is a Stripe/platform detail, not a v1 design concern).
 
 ---
 
@@ -461,16 +519,48 @@ Aggregates from `Payments` where `Status = Paid` and the associated appointment'
 
 **`GET /appointments/{id}`** — `403` if caller is neither the patient nor the consultant on this appointment (resource ownership, Requirements §3.1).
 
+> **⚠️ No-Show Policy Note:** Once an appointment is marked `NoShow` (automatically by the background job 15 minutes after scheduled time), it is **final**. There is no appeal, no manual override, and no reactivation. Both `JoinCall` and `SendMessage` will reject with `409 Conflict`. See Requirements §3.2.2 for the complete fault attribution and refund rules.
+
 **`GET /appointments?status=Confirmed&page=1`** — lists the caller's own appointments (as patient or consultant, whichever role they have).
 
 **`POST /appointments/{id}/cancel`**
+> **See Requirements §3.2.1 for the complete Refund Policy table.** The following is the API implementation of that policy.
+
 ```json
 // Request
 { "reason": "Schedule conflict" }
-// Response 200
-{ "appointmentId": "...", "status": "Cancelled" }
+// Response 200 — cancelled WITH refund (more than 24h before)
+{
+  "appointmentId": "...",
+  "status": "Cancelled",
+  "refund": {
+    "status": "Pending",
+    "message": "Refund initiated. You will receive confirmation shortly."
+  }
+}
+
+// Response 200 — cancelled WITHOUT refund (within 24h window)
+{
+  "appointmentId": "...",
+  "status": "Cancelled",
+  "refund": null,
+  "message": "Appointment cancelled. Cancellation within 24 hours is not eligible for refund."
+}
 ```
-`403` if not a participant. `409` if not in `Confirmed` state (can't cancel something already `Completed`/`Cancelled`).
+`403` if not a participant. `409` if not in `Confirmed` state (can't cancel something already `Completed`/`Cancelled`/`PendingPayment`).
+
+**Refund Logic (implementation of Requirements §3.2.1):**
+- If `Now() < ScheduledStartUtc - 24h` (more than 24h before):
+  1. `Appointment.Status = Cancelled`
+  2. `Payment.RefundStatus = Pending`
+  3. Call Stripe API to create refund (`POST /v1/refunds` with `payment_intent` ID)
+  4. Store `StripeRefundId` in `Payment`
+  5. Return `200` with `refund.status = "Pending"`
+  6. Stripe webhook `charge.refunded` later updates `RefundStatus = Succeeded` + `RefundedAt`
+- If `Now() >= ScheduledStartUtc - 24h` (within 24h):
+  1. `Appointment.Status = Cancelled` only
+  2. No refund initiated
+  3. Return `200` with `refund = null`
 
 **Response — `409 Conflict`** (cancellation window expired — Requirements §8's fixed rule: free cancellation up to 24h before the appointment):
 ```json
@@ -481,7 +571,7 @@ Aggregates from `Payments` where `Status = Paid` and the associated appointment'
   "detail": "Appointments can only be cancelled more than 24 hours before the scheduled time."
 }
 ```
-Server-side check: `409` when `Now() > ScheduledStartUtc - 24h`. Treated as a `409` (state/business-rule conflict) rather than `400` (malformed request) — the request itself is well-formed; it's the *current moment relative to the appointment* that makes it invalid, the same category as "slot no longer available."
+Server-side check: `409` when `Now() > ScheduledStartUtc - 24h`. Treated as a `409` (state/business-rule conflict) rather than `400` (malformed request) — the request itself is well-formed; it's the *current moment relative to the appointment* that makes it invalid, the same category as "slot no longer available.""
 
 ---
 
@@ -541,7 +631,7 @@ Implements Sequence Diagrams, Document 3, Diagrams 2 (WebRTC signaling) and the 
 | Method | Payload | Behavior |
 |---|---|---|
 | `SendMessage` | `{ appointmentId, content }` | Validates sender is a participant (Requirements §3.4), persists to `ChatMessages`, then broadcasts |
-| `JoinCall` | `{ appointmentId }` | Validates participant + `Appointment.Status ∈ {Confirmed, InProgress}` (Sequence Diagrams, Diagram 2). On the *first* successful `JoinCall` for a `Confirmed` appointment, transitions `Appointment.Status` to `InProgress`, then relays signaling |
+| `JoinCall` | `{ appointmentId }` | Validates participant + `Appointment.Status ∈ {Confirmed, InProgress}` (Sequence Diagrams, Diagram 2). **Rejects with error if `Appointment.Status = NoShow`** ("This appointment has been marked as no-show and cannot be joined"). On the *first* successful `JoinCall` for a `Confirmed` appointment, transitions `Appointment.Status` to `InProgress`, records `Consultation.PatientJoinedAt` or `Consultation.ConsultantJoinedAt` (depending on caller role), then relays signaling |
 | `SendSignal` | `{ appointmentId, type: "offer"\|"answer"\|"ice-candidate", payload }` | Validates participant + `Appointment.Status ∈ {Confirmed, InProgress}`, then relays SDP/ICE data to the other participant — Hub never inspects or stores payload contents |
 | `LeaveCall` | `{ appointmentId }` | Notifies the other participant the call ended |
 

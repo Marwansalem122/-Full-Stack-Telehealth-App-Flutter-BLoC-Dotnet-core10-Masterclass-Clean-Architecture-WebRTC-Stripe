@@ -1,0 +1,32 @@
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\bin\Debug\net10.0\TelehealthPlatform.Application.deps.json
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\bin\Debug\net10.0\TelehealthPlatform.Application.dll
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\bin\Debug\net10.0\TelehealthPlatform.Application.pdb
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\bin\Debug\net10.0\TelehealthPlatform.Domain.dll
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\bin\Debug\net10.0\TelehealthPlatform.Domain.pdb
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.csproj.AssemblyReference.cache
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.GeneratedMSBuildEditorConfig.editorconfig
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.AssemblyInfoInputs.cache
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.AssemblyInfo.cs
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.csproj.CoreCompileInputs.cache
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.sourcelink.json
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\Teleheal.18720139.Up2Date
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.dll
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\refint\TelehealthPlatform.Application.dll
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.pdb
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\ref\TelehealthPlatform.Application.dll
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\bin\Debug\net10.0\TelehealthPlatform.Application.deps.json
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\bin\Debug\net10.0\TelehealthPlatform.Application.dll
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\bin\Debug\net10.0\TelehealthPlatform.Application.pdb
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\bin\Debug\net10.0\TelehealthPlatform.Domain.dll
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\bin\Debug\net10.0\TelehealthPlatform.Domain.pdb
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.csproj.AssemblyReference.cache
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.GeneratedMSBuildEditorConfig.editorconfig
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.AssemblyInfoInputs.cache
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.AssemblyInfo.cs
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.csproj.CoreCompileInputs.cache
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.sourcelink.json
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\Teleheal.18720139.Up2Date
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.dll
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\refint\TelehealthPlatform.Application.dll
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\TelehealthPlatform.Application.pdb
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Application\obj\Debug\net10.0\ref\TelehealthPlatform.Application.dll

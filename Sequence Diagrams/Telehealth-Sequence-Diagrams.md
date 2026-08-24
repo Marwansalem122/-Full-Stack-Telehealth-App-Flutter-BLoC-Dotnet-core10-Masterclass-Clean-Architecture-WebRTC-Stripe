@@ -2,7 +2,7 @@
 
 **System Design Series · Document 3 of 4** (ERD → Architecture → **Sequence Diagrams** → API Contract)
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
-**Status:** v5 — aligned with Requirements Document v15 and Security Deep-Dive Document 5. Added Auth/Security sequence diagrams (Forgot/Reset Password, Email Verification, Refresh Token Rotation & Reuse Detection).
+**Status:** v8 — aligned with Requirements Document v19. Added No-Show Detection sequence diagram (background job, fault attribution, late-join protection).. Added Cancellation + Refund Flow sequence diagram.. Added Native SDK Layer sequence diagram (Platform Channel communication for WebRTC + Secure Storage). and Security Deep-Dive Document 5. Added Auth/Security sequence diagrams (Forgot/Reset Password, Email Verification, Refresh Token Rotation & Reuse Detection).
 
 ---
 
@@ -16,6 +16,7 @@ A Sequence Diagram isn't needed for every endpoint — only for flows with real 
 4. **Forgot / Reset Password** — anti-enumeration, token security, session invalidation
 5. **Email Verification** — registration flow, verification gate
 6. **Refresh Token Rotation & Reuse Detection** — rotation, family binding, theft detection
+7. **Flutter → Native SDK Communication** — Platform Channel pattern for WebRTC media pipeline and hardware-backed encryption
 
 ---
 
@@ -377,3 +378,295 @@ Change Password: [PasswordHash updated + RefreshTokens deleted] (1 TX) → HTTP 
 ```
 
 `SignalR` / HTTP response is a **delivery mechanism**, not a source of truth — if the recipient is offline or the request fails, the underlying state change is still safely committed.
+
+
+---
+
+## 7. Flutter → Native SDK Communication (Platform Channels)
+
+This diagram shows how the Flutter app delegates platform-specific capabilities to native Kotlin (Android) and Swift (iOS) code while maintaining Clean Architecture boundaries.
+
+### 7.1 WebRTC Media Initialization
+
+```mermaid
+sequenceDiagram
+    participant F as Flutter (Dart)
+    participant B as BLoC / UseCase
+    participant D as Domain Interface (Dart)
+    participant R as NativeRepository (Dart)
+    participant CH as MethodChannel
+    participant NA as Native Plugin (Kotlin/Swift)
+    participant OS as OS APIs (Camera2/AVFoundation)
+
+    F->>B: User taps "Join Call"
+    B->>D: IWebRTCNativeService.initializeLocalStream()
+    D->>R: WebRTCNativeServiceImpl
+    R->>CH: invokeMethod('initializeLocalStream', args)
+    CH->>NA: onMethodCall received
+    NA->>OS: Camera2 / AVFoundation setup
+    OS-->>NA: Local media stream ready
+    NA-->>CH: result.success(streamId)
+    CH-->>R: Future completes
+    R-->>D: Stream initialized
+    D-->>B: Success
+    B-->>F: Update UI (show local preview)
+```
+
+### 7.2 Secure Storage — Hardware-Backed Key Generation
+
+```mermaid
+sequenceDiagram
+    participant F as Flutter (Dart)
+    participant B as BLoC / UseCase
+    participant D as Domain Interface (Dart)
+    participant R as NativeRepository (Dart)
+    participant CH as MethodChannel
+    participant NA as Native Plugin (Kotlin/Swift)
+    participant OS as Keystore / Secure Enclave
+
+    F->>B: Chat message to send
+    B->>D: ISecureStorageNativeService.getOrCreateEncryptionKey()
+    D->>R: SecureStorageNativeServiceImpl
+    R->>CH: invokeMethod('getOrCreateKey', {keyAlias: 'chat_encryption'})
+    CH->>NA: onMethodCall received
+    alt Key exists in Keystore/Secure Enclave
+        NA->>OS: Retrieve existing key
+        OS-->>NA: Key reference (never leaves hardware)
+    else Key does not exist
+        NA->>OS: Generate new AES-256-GCM key (hardware-backed)
+        OS-->>NA: Key created
+    end
+    NA->>NA: Encrypt plaintext using hardware key
+    NA-->>CH: result.success(encryptedData)
+    CH-->>R: Encrypted payload
+    R-->>D: Encrypted data ready
+    D-->>B: Return encrypted content
+    B->>B: Send encrypted content via SignalR
+```
+
+### 7.3 Incoming Call — CallKit (iOS) / ConnectionService (Android)
+
+```mermaid
+sequenceDiagram
+    participant API as ASP.NET Core API
+    participant PN as Push Notification (FCM/APNs)
+    participant NA as Native Plugin (Kotlin/Swift)
+    participant OS as CallKit / ConnectionService
+    participant CH as EventChannel
+    participant F as Flutter (Dart)
+    participant B as BLoC
+
+    API->>PN: Send push notification (v2)
+    PN->>NA: Notification received (background)
+    NA->>OS: Report incoming call
+    OS->>OS: Show system call UI
+    OS-->>NA: User answered
+    NA->>CH: EventChannel.send({event: 'call_answered'})
+    CH->>F: Stream listener triggered
+    F->>B: IncomingCallAnswered event
+    B->>B: Navigate to call screen
+    B->>B: JoinCall via SignalR
+```
+
+> **⚠️ Note:** Push notifications (FCM/APNs) are v2, but the native plugin structure for CallKit/ConnectionService must be designed in v1 so the architecture supports it. In v1, the incoming call is triggered by SignalR while the app is foreground, but the native service registration happens at app startup.
+
+### What these diagrams lock in
+
+- **Native code is a capability provider, not a decision maker.** All business logic (when to start a call, what to encrypt) stays in Dart Domain Layer.
+- **MethodChannel for request/response** (synchronous-like calls: initialize camera, encrypt data).
+- **EventChannel for streaming events** (asynchronous: incoming call events, ICE candidate events from native WebRTC).
+- **Hardware-backed encryption keys never leave the secure hardware.** The native plugin encrypts/decrypts on the native side; only ciphertext crosses the Platform Channel boundary.
+- **Clean Architecture preserved:** Domain Layer defines interfaces; Data Layer implements them using Platform Channels.
+
+
+---
+
+## 8. Cancellation + Refund Flow
+
+This diagram covers both patient-initiated and consultant-initiated cancellations. The refund rule is identical for both: full automatic refund if cancelled more than 24 hours before the scheduled time; no refund if within 24 hours.
+
+```mermaid
+sequenceDiagram
+    participant U as User (Patient or Consultant)
+    participant API as ASP.NET Core API
+    participant DB as SQL Server
+    participant ST as Stripe
+    participant P as Other Participant (Patient/Consultant)
+
+    U->>API: POST /appointments/{id}/cancel { reason }
+    API->>API: Authenticate + Authorize (must be participant)
+    API->>DB: SELECT Appointment + Payment
+    alt Appointment.Status != Confirmed
+        API-->>U: 409 Conflict (not cancellable)
+    else Within 24h of ScheduledStartUtc
+        API->>DB: BEGIN TRANSACTION
+        API->>DB: UPDATE Appointment.Status = Cancelled
+        API->>DB: UPDATE Appointment.CancellationReason = reason
+        API->>DB: UPDATE Appointment.CancelledAt = Now
+        API->>DB: COMMIT
+        API->>API: Create Notification (to other participant)
+        API-->>U: 200 OK { status: Cancelled, refund: null, message: "No refund — within 24h window" }
+        API-->>P: SignalR: appointment cancelled
+    else More than 24h before ScheduledStartUtc
+        API->>ST: POST /v1/refunds { payment_intent: pi_xxx }
+        alt Stripe refund creation fails
+            ST-->>API: Error
+            API->>DB: BEGIN TRANSACTION
+            API->>DB: UPDATE Appointment.Status = Cancelled
+            API->>DB: UPDATE Payment.RefundStatus = Failed
+            API->>DB: COMMIT
+            API-->>U: 200 OK { status: Cancelled, refund: { status: Failed }, message: "Refund failed. Contact support." }
+        else Stripe refund created
+            ST-->>API: Refund object (re_xxx)
+            API->>DB: BEGIN TRANSACTION
+            API->>DB: UPDATE Appointment.Status = Cancelled
+            API->>DB: UPDATE Appointment.CancellationReason = reason
+            API->>DB: UPDATE Appointment.CancelledAt = Now
+            API->>DB: UPDATE Payment.StripeRefundId = re_xxx
+            API->>DB: UPDATE Payment.RefundStatus = Pending
+            API->>DB: COMMIT
+            API-->>U: 200 OK { status: Cancelled, refund: { status: Pending }, message: "Refund initiated" }
+            API-->>P: SignalR: appointment cancelled
+        end
+    end
+
+    Note over ST,API: Later: Stripe webhook charge.refunded
+    ST->>API: Webhook: charge.refunded
+    API->>API: Verify signature + deduplicate (same atomic INSERT pattern)
+    API->>DB: BEGIN TRANSACTION
+    API->>DB: UPDATE Payment.RefundStatus = Succeeded
+    API->>DB: UPDATE Payment.RefundedAt = Now
+    API->>DB: Create Notification (to patient: "Refund processed")
+    API->>DB: COMMIT
+    API-->>P: SignalR: refund confirmed
+```
+
+### What this flow locks in
+
+- **Same refund rule for both parties** — patient or consultant, the 24h rule is identical. This keeps the policy simple and fair.
+- **Refund is synchronous initiation, asynchronous confirmation** — the API calls Stripe immediately during cancellation, but the actual money movement is confirmed later via webhook (same atomic pattern as payment confirmation).
+- **Transaction boundary** — `Appointment.Status = Cancelled` + `Payment.RefundStatus = Pending` + `StripeRefundId` are committed together. A crash can't leave the appointment cancelled with no refund record.
+- **Failed refund handling** — if Stripe refund creation fails (rare), `RefundStatus = Failed` is recorded and the user is informed. Manual support intervention is needed (acceptable for v1).
+- **Earnings impact** — `GET /consultants/me/earnings` excludes `RefundStatus = Succeeded` payments, so refunded appointments never count as income.
+- **Notification to both parties** — whoever cancels, the other participant receives a SignalR notification + in-app notification.
+
+
+---
+
+## 9. No-Show Detection
+
+This diagram shows how the system automatically detects and handles no-show appointments using a background job, without requiring manual intervention.
+
+### 9.1 Normal Call Start (for contrast)
+
+```mermaid
+sequenceDiagram
+    participant P as Patient
+    participant Hub as SignalR Hub
+    participant API as ASP.NET Core API
+    participant DB as SQL Server
+    participant C as Consultant
+
+    Note over P,C: ScheduledStartUtc = 09:00
+
+    P->>Hub: JoinCall(appointmentId)
+    Hub->>API: Validate participant + Status = Confirmed
+    API->>DB: UPDATE Consultation.PatientJoinedAt = Now
+    API->>DB: UPDATE Consultation.StartedAt = Now
+    API->>DB: UPDATE Appointment.Status = InProgress
+    API->>DB: COMMIT
+    Hub->>C: IncomingCall notification
+
+    C->>Hub: JoinCall(appointmentId)
+    Hub->>API: Validate participant + Status = InProgress
+    API->>DB: UPDATE Consultation.ConsultantJoinedAt = Now
+    API->>DB: COMMIT
+
+    Note over P,C: Call proceeds normally — no-show job will ignore this appointment because StartedAt is set
+```
+
+### 9.2 No-Show Detection — Background Job
+
+```mermaid
+sequenceDiagram
+    participant BG as NoShowDetectionService<br/>(BackgroundService)
+    participant DB as SQL Server
+    participant ST as Stripe
+    participant P as Patient
+    participant C as Consultant
+
+    Note over BG: Runs every 5 minutes
+
+    BG->>DB: SELECT Appointments WHERE<br/>Status = Confirmed AND<br/>ScheduledStartUtc + 15min <= Now AND<br/>Consultation.StartedAt IS NULL
+
+    alt Patient never joined, Consultant joined
+        DB-->>BG: Appointment found (PatientJoinedAt = NULL, ConsultantJoinedAt = set)
+        BG->>DB: BEGIN TRANSACTION
+        BG->>DB: UPDATE Appointment.Status = NoShow
+        BG->>DB: UPDATE Consultation.Status = PatientNoShow
+        BG->>DB: INSERT Notification (to patient: "You missed your appointment")
+        BG->>DB: INSERT Notification (to consultant: "Patient did not show")
+        BG->>DB: COMMIT
+        BG-->>P: SignalR: no-show notification
+        BG-->>C: SignalR: no-show notification
+        Note right of BG: No refund — patient forfeits payment
+
+    else Consultant never joined, Patient joined
+        DB-->>BG: Appointment found (PatientJoinedAt = set, ConsultantJoinedAt = NULL)
+        BG->>DB: BEGIN TRANSACTION
+        BG->>DB: UPDATE Appointment.Status = NoShow
+        BG->>DB: UPDATE Consultation.Status = ConsultantNoShow
+        BG->>DB: INSERT Notification (to patient: "Consultant did not show — refund initiated")
+        BG->>DB: INSERT Notification (to consultant: "You missed your appointment")
+        BG->>DB: UPDATE Payment.RefundStatus = Pending
+        BG->>DB: COMMIT
+        BG->>ST: POST /v1/refunds (payment_intent)
+        ST-->>BG: Refund created (re_xxx)
+        BG-->>P: SignalR: refund initiated
+        BG-->>C: SignalR: no-show notification
+        Note right of BG: Full refund — consultant at fault
+
+    else Neither joined (mutual no-show)
+        DB-->>BG: Appointment found (both NULL)
+        BG->>DB: BEGIN TRANSACTION
+        BG->>DB: UPDATE Appointment.Status = NoShow
+        BG->>DB: UPDATE Consultation.Status = MutualNoShow
+        BG->>DB: INSERT Notification (to both: "Appointment missed by both parties — no refund issued")
+        BG->>DB: COMMIT
+        BG-->>P: SignalR: no-show notification
+        BG-->>C: SignalR: no-show notification
+        Note right of BG: DECISION: No refund. Patient forfeits payment.<br/>v1 rule: no partial refunds, no platform liability.<br/>See Requirements §3.2.2 "Mutual No-Show — Explicit Decision".
+
+    end
+
+    Note over ST,BG: Later: Stripe webhook charge.refunded (for consultant no-show)
+    ST->>BG: Webhook: charge.refunded
+    BG->>DB: UPDATE Payment.RefundStatus = Succeeded, RefundedAt = Now
+    BG-->>P: SignalR: refund confirmed
+```
+
+### 9.3 Late Join Attempt (after NoShow marked)
+
+```mermaid
+sequenceDiagram
+    participant P as Patient
+    participant Hub as SignalR Hub
+    participant DB as SQL Server
+
+    Note over P: 20 minutes after scheduled time
+    P->>Hub: JoinCall(appointmentId)
+    Hub->>DB: SELECT Appointment.Status
+    DB-->>Hub: Status = NoShow
+    Hub-->>P: Error: "This appointment has been marked as no-show and cannot be joined"
+    Note right of P: Late join is blocked — state is final
+```
+
+### What this flow locks in
+
+- **15-minute grace period** — hard cutoff. Adjustable in v2 based on analytics.
+- **Fault attribution** — who joined and who didn't determines who is at fault, which drives the refund decision (Requirements §3.2.1).
+- **Single transaction** — status update + notification + refund initiation (if applicable) are committed together. A crash can't leave the appointment as `NoShow` with no notification sent.
+- **Late join protection** — once `NoShow` is set, `JoinCall` rejects permanently. The appointment state is final.
+- **Background job is idempotent** — if the job runs twice on the same appointment (e.g., server restart), the second run finds `Status = NoShow` and skips it. No double-processing.
+- **No manual intervention** — the entire flow is automatic from detection to refund (for consultant no-show).
+- **Mutual no-show is deterministic** — never leaves the appointment in an ambiguous state. The background job commits `MutualNoShow` + no refund immediately. There is no "null return" or "pending decision" state.

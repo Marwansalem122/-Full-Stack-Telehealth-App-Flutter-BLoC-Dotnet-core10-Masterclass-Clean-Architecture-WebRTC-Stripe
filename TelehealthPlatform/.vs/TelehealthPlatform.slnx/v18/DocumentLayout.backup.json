@@ -1,0 +1,126 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\Telehealth App\\TelehealthPlatform\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\entities\\payment.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\entities\\payment.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\entities\\appointment.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\entities\\appointment.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\entities\\consultation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\entities\\consultation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\enums\\appointmentstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\enums\\appointmentstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\enums\\consultationstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\enums\\consultationstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\enums\\paymentrefundstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\enums\\paymentrefundstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 5,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:1:0:{d212f56b-c48a-434c-a121-1c5d80b59b9f}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "ConsultationStatus.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\ConsultationStatus.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Enums\\ConsultationStatus.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\ConsultationStatus.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Enums\\ConsultationStatus.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-23T19:55:23.862Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Consultation.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Consultation.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Entities\\Consultation.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Consultation.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Entities\\Consultation.cs",
+              "ViewState": "AgIAAE0AAACAZmZmZmYGwFkAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-23T19:38:28.167Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Appointment.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Appointment.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Entities\\Appointment.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Appointment.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Entities\\Appointment.cs",
+              "ViewState": "AgIAAAYAAAAAmpmZmZkdwAsAAAA7AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-23T19:12:53.725Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Payment.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
+              "ViewState": "AgIAACgAAAAAAAAAAAAowEgAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-23T19:11:45.433Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "AppointmentStatus.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\AppointmentStatus.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Enums\\AppointmentStatus.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\AppointmentStatus.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Enums\\AppointmentStatus.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAAMAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-23T19:09:33.877Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "PaymentRefundStatus.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\PaymentRefundStatus.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Enums\\PaymentRefundStatus.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\PaymentRefundStatus.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Enums\\PaymentRefundStatus.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAAKAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-23T19:10:41.418Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
