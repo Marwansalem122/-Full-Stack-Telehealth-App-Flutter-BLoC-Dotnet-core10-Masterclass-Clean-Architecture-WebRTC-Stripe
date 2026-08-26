@@ -3,28 +3,56 @@
   "WorkspaceRootPath": "D:\\Telehealth App\\TelehealthPlatform\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\entities\\payment.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\entities\\payment.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\auth\\register\\registercommandhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\auth\\register\\registercommandhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\entities\\appointment.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\entities\\appointment.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\interfaces\\iconsultantprofilerepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\interfaces\\iconsultantprofilerepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\entities\\consultation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\entities\\consultation.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\interfaces\\ipatientprofilerepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\interfaces\\ipatientprofilerepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\enums\\appointmentstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\enums\\appointmentstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\auth\\getpasswordpolicy\\getpasswordpolicyqueryhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\auth\\getpasswordpolicy\\getpasswordpolicyqueryhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\enums\\consultationstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\enums\\consultationstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\auth\\changepassword\\changepasswordcommandvalidator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\auth\\changepassword\\changepasswordcommandvalidator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\enums\\paymentrefundstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\enums\\paymentrefundstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\passwordrulevalidator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\passwordrulevalidator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\auth\\register\\registercommandvalidator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\auth\\register\\registercommandvalidator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\passwordpolicyconstants.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\passwordpolicyconstants.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\auth\\getpasswordpolicy\\getpasswordpolicyquery.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\auth\\getpasswordpolicy\\getpasswordpolicyquery.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\auth\\changepassword\\changepasswordcommandhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\auth\\changepassword\\changepasswordcommandhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\auth\\changepassword\\changepasswordcommand.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\auth\\changepassword\\changepasswordcommand.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\auth\\resendverification\\resendverificationcommandhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\auth\\resendverification\\resendverificationcommandhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\auth\\resendverification\\resendverificationcommand.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\auth\\resendverification\\resendverificationcommand.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -34,7 +62,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 5,
+          "SelectedChildIndex": 4,
           "Children": [
             {
               "$type": "Bookmark",
@@ -46,77 +74,172 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
-              "Title": "ConsultationStatus.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\ConsultationStatus.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Enums\\ConsultationStatus.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\ConsultationStatus.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Enums\\ConsultationStatus.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAABAAAAAAAAAA==",
+              "DocumentIndex": 1,
+              "Title": "IConsultantProfileRepository.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Interfaces\\IConsultantProfileRepository.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Interfaces\\IConsultantProfileRepository.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Interfaces\\IConsultantProfileRepository.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Interfaces\\IConsultantProfileRepository.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAABQAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-23T19:55:23.862Z"
+              "WhenOpened": "2026-08-26T08:39:23.536Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 2,
-              "Title": "Consultation.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Consultation.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Entities\\Consultation.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Consultation.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Entities\\Consultation.cs",
-              "ViewState": "AgIAAE0AAACAZmZmZmYGwFkAAAABAAAAAAAAAA==",
+              "Title": "IPatientProfileRepository.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Interfaces\\IPatientProfileRepository.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Interfaces\\IPatientProfileRepository.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Interfaces\\IPatientProfileRepository.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Interfaces\\IPatientProfileRepository.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-23T19:38:28.167Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "Appointment.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Appointment.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Entities\\Appointment.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Appointment.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Entities\\Appointment.cs",
-              "ViewState": "AgIAAAYAAAAAmpmZmZkdwAsAAAA7AAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-23T19:12:53.725Z",
+              "WhenOpened": "2026-08-26T08:39:02.581Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "Payment.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
-              "ViewState": "AgIAACgAAAAAAAAAAAAowEgAAAABAAAAAAAAAA==",
+              "Title": "RegisterCommandHandler.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandHandler.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandHandler.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandHandler.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandHandler.cs",
+              "ViewState": "AgIAACoAAAAAAAAAAAAYwDwAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-23T19:11:45.433Z",
+              "WhenOpened": "2026-08-26T08:35:22.908Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "PasswordRuleValidator.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\PasswordRuleValidator.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\PasswordRuleValidator.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\PasswordRuleValidator.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\PasswordRuleValidator.cs",
+              "ViewState": "AgIAAAgAAAAAAAAAAAAowCgAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T08:34:04.049Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "RegisterCommandValidator.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandValidator.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandValidator.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandValidator.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandValidator.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAABHAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T08:32:02.105Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "ChangePasswordCommandValidator.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommandValidator.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommandValidator.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommandValidator.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommandValidator.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAA1AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T08:28:58.318Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 3,
-              "Title": "AppointmentStatus.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\AppointmentStatus.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Enums\\AppointmentStatus.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\AppointmentStatus.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Enums\\AppointmentStatus.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAAMAAAAAAAAAA==",
+              "Title": "GetPasswordPolicyQueryHandler.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\GetPasswordPolicy\\GetPasswordPolicyQueryHandler.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Auth\\GetPasswordPolicy\\GetPasswordPolicyQueryHandler.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\GetPasswordPolicy\\GetPasswordPolicyQueryHandler.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Auth\\GetPasswordPolicy\\GetPasswordPolicyQueryHandler.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-23T19:09:33.877Z"
+              "WhenOpened": "2026-08-26T08:30:05.971Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "PaymentRefundStatus.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\PaymentRefundStatus.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Enums\\PaymentRefundStatus.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\PaymentRefundStatus.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Enums\\PaymentRefundStatus.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAAKAAAAAAAAAA==",
+              "DocumentIndex": 7,
+              "Title": "PasswordPolicyConstants.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\PasswordPolicyConstants.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\PasswordPolicyConstants.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\PasswordPolicyConstants.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\PasswordPolicyConstants.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-23T19:10:41.418Z"
+              "WhenOpened": "2026-08-26T08:31:38.864Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "GetPasswordPolicyQuery.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\GetPasswordPolicy\\GetPasswordPolicyQuery.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Auth\\GetPasswordPolicy\\GetPasswordPolicyQuery.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\GetPasswordPolicy\\GetPasswordPolicyQuery.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Auth\\GetPasswordPolicy\\GetPasswordPolicyQuery.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAsAAAAiAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T08:29:40.675Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "ChangePasswordCommandHandler.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommandHandler.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommandHandler.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommandHandler.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommandHandler.cs",
+              "ViewState": "AgIAABoAAABgZmZmZmYqwCYAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T08:28:17.309Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "ChangePasswordCommand.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommand.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommand.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommand.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Auth\\ChangePassword\\ChangePasswordCommand.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAABoAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T08:27:53.224Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "ResendVerificationCommandHandler.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\ResendVerification\\ResendVerificationCommandHandler.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Auth\\ResendVerification\\ResendVerificationCommandHandler.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\ResendVerification\\ResendVerificationCommandHandler.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Auth\\ResendVerification\\ResendVerificationCommandHandler.cs",
+              "ViewState": "AgIAABgAAACA//////8HwCIAAABDAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T08:27:24.108Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "ResendVerificationCommand.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\ResendVerification\\ResendVerificationCommand.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Auth\\ResendVerification\\ResendVerificationCommand.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\ResendVerification\\ResendVerificationCommand.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Auth\\ResendVerification\\ResendVerificationCommand.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAABBAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-26T08:26:58.083Z",
+              "EditorCaption": ""
             }
           ]
         }

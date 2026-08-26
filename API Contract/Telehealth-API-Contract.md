@@ -465,6 +465,8 @@ Flutter calls this on registration/change-password screens to display requiremen
 
 **`GET /consultants/me`** / **`PUT /consultants/me`** — same pattern. `IsVerified` is **read-only** via this endpoint — it's only ever flipped by direct DB update in v1 (Requirements §3.1), never through a client-facing field.
 
+> **⚠️ `timeZoneId` is required for consultants.** The `PUT /consultants/me` request must include a valid IANA timezone ID (e.g., `"Africa/Cairo"`, `"Asia/Riyadh"`). While the field is technically optional in the request body (to allow partial updates of other fields), the consultant **cannot** set availability until `timeZoneId` is populated. See `PUT /consultants/me/availability` below.
+
 **`GET /consultants?specialty=Cardiology&page=1`** — public-to-authenticated search, returns only `IsVerified = true` consultants.
 ```json
 {
@@ -494,7 +496,19 @@ Computed server-side as `Weekly Availability − Existing Active Appointments` (
   ]
 }
 ```
-> **⚠️ Deliberately *not* `startTimeUtc`/`endTimeUtc` — this must be the consultant's local wall-clock time.** A recurring weekly rule like "Monday 09:00–13:00" only makes sense expressed in the consultant's own timezone; storing a fixed UTC offset for a *recurring* rule breaks the moment DST shifts, since the UTC equivalent of "9am Cairo time" isn't constant year-round. The server converts using `ConsultantProfile.TimeZoneId` (already required at profile creation, Requirements §3.1) at the point of computing actual bookable slots — the conversion happens on read (`GET /consultants/{id}/availability`, which *does* return UTC, per Requirements §3.2's rule that the backend always returns UTC to clients), not on write. `AvailabilitySlots.StartTimeUtc`/`EndTimeUtc` in the ERD remain UTC columns internally — but that's the *stored, computed* representation for a given date, not what this endpoint accepts as input.
+> **⚠️ Deliberately *not* `startTimeUtc`/`endTimeUtc` — this must be the consultant's local wall-clock time.** A recurring weekly rule like "Monday 09:00–13:00" only makes sense expressed in the consultant's own timezone; storing a fixed UTC offset for a *recurring* rule breaks the moment DST shifts, since the UTC equivalent of "9am Cairo time" isn't constant year-round. The server converts using `ConsultantProfile.TimeZoneId` at the point of computing actual bookable slots — the conversion happens on read (`GET /consultants/{id}/availability`, which *does* return UTC, per Requirements §3.2's rule that the backend always returns UTC to clients), not on write. `AvailabilitySlots.StartTimeUtc`/`EndTimeUtc` in the ERD remain UTC columns internally — but that's the *stored, computed* representation for a given date, not what this endpoint accepts as input.
+
+**Precondition:** `ConsultantProfile.TimeZoneId` must be set. If null:
+
+**Response — `409 Conflict`:**
+```json
+{
+  "type": ".../errors/timezone-required",
+  "title": "Timezone Required",
+  "status": 409,
+  "detail": "You must set your timezone in your profile before setting availability."
+}
+```
 
 Replaces the full weekly schedule (simplest correct semantics for v1 — no partial-update merge logic to get wrong).
 
