@@ -10,15 +10,14 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
     {
         builder.HasKey(t => t.Id);
 
-        builder.Property(t => t.TokenHash)
-            .IsRequired()
-            .HasMaxLength(256);
+        builder.Property(t => t.TokenHash).IsRequired().HasMaxLength(256);
+        builder.HasIndex(t => t.TokenHash).IsUnique(); // was non-unique before — fixed per ERD v1.2
 
-        builder.HasIndex(t => t.TokenHash);
+        builder.Property(t => t.RevocationReason).HasConversion<string>().HasMaxLength(30);
 
-        builder.HasOne<User>()
-            .WithMany()
-            .HasForeignKey(t => t.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // Powers RevokeFamilyAsync's bulk update (Security Deep-Dive §6.6)
+        builder.HasIndex(t => t.FamilyId);
+
+        builder.HasOne<User>().WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);
     }
 }

@@ -18,6 +18,8 @@ public class TelehealthDbContext(DbContextOptions<TelehealthDbContext> options) 
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<StripeWebhookEvent> StripeWebhookEvents => Set<StripeWebhookEvent>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<FailedLoginAttempt> FailedLoginAttempts => Set<FailedLoginAttempt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
