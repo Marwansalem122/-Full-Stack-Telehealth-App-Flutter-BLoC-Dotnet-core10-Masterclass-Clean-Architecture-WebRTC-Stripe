@@ -1,6 +1,6 @@
 # AI Telehealth Platform — Architecture Diagram (Detailed Reference)
 
-**System Design Series · Document 2 of 5** (ERD → **Architecture** → Sequence Diagrams → API Contract → Security Deep-Dive)<br>**Updated:** Added Native SDK Layer (Kotlin/Android + Swift/iOS)
+**System Design Series · Document 2 of 5** (ERD → **Architecture** → Sequence Diagrams → API Contract → Security Deep-Dive)<br>**Updated:** Added scoped offline caching for the "My Appointments" screen (Hive, cache-aside, display-only — never used for actions like Join Call/Cancel); Replaced Stripe-only payments with `IPaymentProvider` abstraction (Stripe/Regional, per consultant country); Admin Dashboard elevated to v1.5 (Angular)
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
 
 ![Architecture Diagram](./architecture-diagram.png)
@@ -52,6 +52,13 @@ Response: confirmed or rejected
 ```
 
 This directly matches the booking concurrency rules already locked in the Requirements Document and ERD — the backend, not the client, is the single source of truth for whether a slot is actually available.
+
+> **Offline caching — scoped to one screen, not the whole app.** The app has no general offline-first requirement (video calls, chat, and live availability are inherently online-only), but the "My Appointments" list is an explicit exception: the last successfully fetched `GET /appointments` response is cached locally (Hive — lightweight enough for a flat list, no need for a full local SQL database like `drift`) so the screen isn't empty the moment connectivity drops. Implemented as a cache-aside pattern inside the `AppointmentRepository` (Data layer) — the Domain layer and BLoC never know caching exists:
+> ```
+> GET /appointments succeeds → overwrite the Hive cache + timestamp, return fresh data
+> GET /appointments fails (no network) → read from Hive cache, return it with isStale = true + cachedAt
+> ```
+> **The same "backend decides, client displays" rule above still applies to cached data — it's shown, never acted on.** A stale cached appointment can be displayed (with a "last updated X ago" banner), but actions like *Join Call* or *Cancel* always require a fresh network check first; the client never lets a user act on data it can't currently verify against the backend. No other screen (chat, availability, earnings) gets this treatment — extending offline caching beyond this one screen without a concrete reason would be the same kind of premature complexity already rejected elsewhere in this document (Section 15).
 
 > **Why one app with Flavors instead of two separate apps?** Both flavors share the same Clean Architecture codebase (domain, data, BLoC, SignalR client, API clients, models). The only difference is the entry point (`main_patient.dart` vs `main_consultant.dart`) and the presentation layer (screens, navigation). This eliminates code duplication, simplifies maintenance, and speeds up the MVP. Each flavor is built as a separate binary with its own `applicationId` and icon, so the stores treat them as distinct apps even though they share a single codebase.
 
@@ -150,7 +157,7 @@ This is what's meant by a **Modular Monolith**: one deployable application, but 
 
 ## 5. SQL Server (Primary Database)
 
-The system's single source of truth for durable data: Users, PatientProfiles, ConsultantProfiles, Appointments, Consultations, Payments, ChatMessages, AISummaries, AIJobs, Notifications, RefreshTokens, and StripeWebhookEvents. This maps directly onto the ERD built earlier — the relationship between the two documents is simple:
+The system's single source of truth for durable data: Users, PatientProfiles, ConsultantProfiles, Appointments, Consultations, Payments, ChatMessages, AISummaries, AIJobs, Notifications, RefreshTokens, StripeWebhookEvents, and PayoutLedgerEntries. This maps directly onto the ERD built earlier — the relationship between the two documents is simple:
 
 ```
 Architecture Diagram says:  "there is a relational database."
@@ -241,45 +248,68 @@ The rest of the application only ever calls something like `GenerateSummary(...)
 
 ---
 
-## 10. Stripe (Payments + Refunds)
+## 10. Payments — `IPaymentProvider` Abstraction (Stripe + Regional)
+
+> **⚠️ Revised (README v19):** the original version of this section assumed Stripe handles every payment. It can't — **Stripe Connect does not support payouts to Egypt**, and this platform's actual launch market is Egypt + the Arab world first. The API talks to an abstraction, not to Stripe directly, exactly the same pattern already used for `IAIService` — swap the concrete provider without touching business logic.
 
 ```
 Flutter
   |
 ASP.NET Core
   |
-Stripe
-```
-
-Flutter never handles the Stripe secret key. The backend creates the PaymentIntent and returns only what the client needs (the client secret) to complete payment on its side. The webhook is what closes the loop for both payments and refunds:
-
-```
-Stripe
+IPaymentProvider (abstraction)
   |
-Webhook (payment_intent.succeeded)
+  ├── ConsultantProfile.Country is Stripe-supported (Saudi Arabia, UAE, ...)
+  │       → StripeConnectPaymentProvider
+  │
+  └── ConsultantProfile.Country is Stripe-unsupported (Egypt, ...)
+          → RegionalPaymentProvider (Paymob / PayTabs — exact choice is an implementation
+            detail to confirm against each provider's actual API before building)
+```
+
+Flutter never handles either provider's secret key. The backend creates the payment intent/charge and returns only what the client needs to complete payment on its side. **Both providers' webhooks close the loop the same way — payment confirmation is never trusted from the client, regardless of which provider processed it:**
+
+```
+Stripe OR Regional Gateway
+  |
+Webhook (provider-specific event name)
   |
 ASP.NET Core
   |
 Update Payment.Status = Paid + Appointment.Status = Confirmed
 ```
 
+**Where the two paths genuinely diverge — payout, not payment collection:**
+
 ```
-Stripe
-  |
-Webhook (charge.refunded)
-  |
-ASP.NET Core
-  |
-Update Payment.RefundStatus = Succeeded + Payment.RefundedAt
+Stripe path:                              Regional path:
+Payment confirmed                         Payment confirmed
+  |                                          |
+Consultant's Stripe Connect balance       PayoutLedgerEntry created (Pending)
+  |                                          |
+Automatic weekly transfer                 Admin reviews + bank-transfers manually
+(Stripe handles this entirely)              |
+                                           Admin marks PayoutLedgerEntry as Paid
+                                           (Admin Dashboard, Section 10.1)
 ```
 
-> This is the same rule already established in the Requirements Document: **the system never trusts the Flutter client's claim that a payment succeeded** — only the Stripe webhook is treated as the source of truth for payment confirmation. The same principle applies to refunds: the API initiates the refund synchronously during cancellation, but the final confirmation comes via webhook.
+> This is the same rule already established in the Requirements Document: **the system never trusts the Flutter client's claim that a payment succeeded** — only the provider's webhook is treated as the source of truth for payment confirmation. The same principle applies to refunds: the API initiates the refund synchronously during cancellation, but the final confirmation comes via webhook (Stripe path) or the regional gateway's equivalent mechanism (Regional path — must be verified against that gateway's actual refund API before implementation, since not every regional gateway supports automated refunds the way Stripe does).
 
-**Refund flow (v1):**
-- Cancellations >24h before appointment → automatic full refund via Stripe API
+**Refund flow (v1) — same policy, provider-aware execution:**
+- Cancellations >24h before appointment → automatic full refund via the appointment's provider
 - Cancellations <24h → no refund, payment kept
 - `Payment.RefundStatus` tracks: `None` → `Pending` (initiated) → `Succeeded` (webhook confirmed) / `Failed` (rare)
-- Earnings calculation excludes refunded payments
+- Earnings calculation excludes refunded payments, computed in `Payment.Currency` directly — never converted to USD before applying the 80/20 split (README §3.3.1)
+- A refunded `Payment` on the Regional path must not leave a `Pending` `PayoutLedgerEntry` behind — the refund handler must reverse/cancel it in the same transaction
+
+### 10.1 Admin Dashboard — Elevated to v1.5 (Angular, separate project)
+
+The Regional payout path above has no automated settlement — something has to review pending `PayoutLedgerEntries` and confirm when a bank transfer has actually happened. That "something" is a minimal Admin Dashboard, which is why it's no longer purely a v2 deferral (Section 15 still defers the *full* admin suite — analytics, reporting, user management — this is strictly the minimum to make Section 10's Regional path operable):
+
+- View pending `PayoutLedgerEntries`, grouped by consultant
+- Mark a batch as settled after the admin performs the transfer outside the system
+- Manual `ConsultantProfile.IsVerified` toggle (already a v1 requirement with no UI until now)
+- **Stack: Angular** — a separate project/repo from the Flutter apps and the ASP.NET Core API, talking to the same API Contract (no admin-specific backend fork)
 
 ---
 
@@ -430,8 +460,8 @@ The goal for v1 is a **Production-Ready Modular Monolith** — a design that's n
 ```
 Flutter (Patient flavor / Consultant flavor)
     │
-    ├── Dart Layer (UI, BLoC, Domain, API Client)
-    └── Native Layer (Kotlin/Swift — WebRTC, Crypto, CallKit)
+    ├── Dart Layer (UI, BLoC, Domain, API Client, SignalR Client)
+    └── Native Layer (Kotlin/Swift — WebRTC, Crypto, CallKit, FCM Handler)
     │
 ASP.NET Core Modular Monolith
     │
@@ -439,7 +469,7 @@ SQL Server
     │
 Background Worker
 
-  + SignalR, Stripe, WebRTC Signaling, AI Provider, Email Service (as needed)
+  + SignalR, FCM (Push), IPaymentProvider (Stripe/Regional), WebRTC Signaling, AI Provider, Email Service
   + Redis (only once there's a real, present need for it)
 ```
 
@@ -542,22 +572,41 @@ The concept mattering more than the specific tool is the point — the system sh
 
 ---
 
-## 18. Notification Channel Abstraction (Concept Now, Implementation Later)
+## 18. Notification Channel Abstraction (v1: SignalR + FCM)
 
-Notifications in v1 stay exactly as already decided: `Notification → SignalR → Flutter`, with FCM push deferred to v2. That doesn't change.
-
-What's worth adding at the *design* level (not the implementation level) is the shape the abstraction should take once more channels are added:
+Notifications in v1 use **both** channels — not one or the other. The abstraction was designed from the start to support multiple channels:
 
 ```
 INotificationService
        │
-       ├── InApp   (v1 — implemented)
-       ├── Push    (v2)
+       ├── InApp   (v1 — SignalR, real-time when app is open)
+       ├── Push    (v1 — FCM, background/closed app delivery)
        ├── Email   (v2+)
        └── SMS     (v2+)
 ```
 
-Nothing here needs building now — the value is simply designing the `Notifications` table and the calling code so that adding a channel later means adding an implementation of the interface, not restructuring how notifications are triggered.
+**Why both in v1:**
+- **SignalR** delivers instantly when the app is open (chat messages, call events).
+- **FCM** delivers when the app is backgrounded or killed (incoming call alerts, appointment reminders, booking confirmations).
+- A Telehealth app where the patient misses a call because the app was closed is a **critical failure**, not a UX inconvenience.
+
+**Implementation:**
+- `NotificationCreatedDomainEvent` is raised after the `Notification` entity is persisted.
+- `InAppNotificationHandler` reacts: sends via SignalR if the user is connected.
+- `PushNotificationHandler` reacts: sends via FCM to all registered device tokens for that user.
+- Both handlers are independent — one failing does not block the other.
+
+**Native layer responsibility:**
+- FCM messages are received by the native layer (Kotlin/Swift) when the app is backgrounded.
+- `type: "incoming_call"` → trigger CallKit/ConnectionService immediately.
+- `type: "appointment_reminder"` → show standard system notification.
+- When the user taps the notification, the app launches and Flutter handles deep-linking.
+
+**Device token lifecycle:**
+- Token obtained from `FirebaseMessaging.instance.getToken()` → sent to backend via `POST /notifications/device-token`.
+- Token stored in `UserDeviceTokens` (unique per user + platform, multiple devices supported).
+- Token removed on logout via `DELETE /notifications/device-token`.
+- Tokens are refreshed periodically by FCM; Flutter re-registers the new token automatically.
 
 ---
 

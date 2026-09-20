@@ -1,6 +1,6 @@
 # Telehealth Platform — Entity Relationship Diagram
 
-**Version:** v1.4 — Core entities + Supporting entities + Security entities + Refund Flow + HealthProfile Value Object + No-Show Detection
+**Version:** v1.6 — Core entities + Supporting entities + Security entities + Refund Flow + HealthProfile Value Object + No-Show Detection + FCM Push Notifications + Payment Provider Abstraction (Country, Provider, PayoutLedgerEntries)
 
 ```mermaid
 erDiagram
@@ -14,6 +14,8 @@ erDiagram
 
     %% Supporting entities
     APPOINTMENTS ||--o| PAYMENTS : "paid via"
+    PAYMENTS ||--o| PAYOUT_LEDGER_ENTRIES : "owes (Regional provider only)"
+    CONSULTANT_PROFILES ||--o{ PAYOUT_LEDGER_ENTRIES : "is owed"
     APPOINTMENTS ||--o{ CHAT_MESSAGES : contains
     USERS ||--o{ CHAT_MESSAGES : sends
     CONSULTATIONS ||--o| AI_SUMMARIES : generates
@@ -22,6 +24,7 @@ erDiagram
     USERS ||--o{ REFRESH_TOKENS : has
     USERS ||--o{ PASSWORD_RESET_TOKENS : "requests"
     USERS ||--o{ FAILED_LOGIN_ATTEMPTS : "attempts"
+    USERS ||--o{ USER_DEVICE_TOKENS : "devices"
 
     USERS {
         guid Id PK
@@ -41,6 +44,7 @@ erDiagram
         string Specialty
         string Bio
         string TimeZoneId
+        string Country
         bool IsVerified
         string ProfileImageUrl
     }
@@ -93,6 +97,7 @@ erDiagram
         guid AppointmentId FK
         decimal Amount
         string Currency
+        string Provider
         string StripePaymentIntentId
         string StripeRefundId
         string IdempotencyKey
@@ -101,6 +106,18 @@ erDiagram
         datetime CreatedAt
         datetime PaidAt
         datetime RefundedAt
+    }
+
+    PAYOUT_LEDGER_ENTRIES {
+        guid Id PK
+        guid ConsultantId FK
+        guid PaymentId FK
+        decimal AmountOwed
+        string Currency
+        string Status
+        datetime CreatedAt
+        datetime SettledAt
+        guid SettledByAdminUserId
     }
 
     CHAT_MESSAGES {
@@ -256,3 +273,33 @@ Added two nullable timestamp fields to support automatic no-show detection:
 - `StartedAt IS NULL` + both null → **Mutual no-show**
 
 These fields enable the refund policy (§3.2.1) to be applied automatically without manual intervention.
+
+
+### `UserDeviceTokens` — FCM Push Notification Tokens (added v1.5)
+
+Stores Firebase Cloud Messaging (FCM) device tokens per user. Multiple devices per user are supported (e.g., phone + tablet).
+
+- `Token` → the FCM device token obtained from `FirebaseMessaging.instance.getToken()`. `UK` constraint prevents duplicate tokens across users.
+- `Platform` → `"android"` or `"ios"`. Used to route to the correct FCM API (Android vs iOS have different payload structures).
+- `LastUsedAt` → updated when a push notification is successfully delivered to this token. Helps identify stale tokens for cleanup.
+- **Token refresh:** FCM tokens can change (app reinstall, token rotation). Flutter detects the change via `onTokenRefresh` and re-registers via `POST /notifications/device-token`. The backend replaces the old token.
+- **Cleanup:** A background job (v1 minimal — can be manual for now) removes tokens where `LastUsedAt < Now.AddMonths(-3)`.
+
+
+### `ConsultantProfiles.Country` and `Payments.Provider` — added v1.6
+
+Two small but load-bearing fields, added together because they're causally linked:
+
+- `ConsultantProfiles.Country` → previously missing entirely from the ERD. Required at profile completion (alongside `TimeZoneId`). Determines which `IPaymentProvider` a consultant's appointments route through (README §3.3.1) — the platform launches in Egypt + the Arab world first, and **Stripe Connect does not support payouts to Egypt**, so a single global payment path was never actually workable.
+- `Payments.Provider` → records which concrete provider processed a given payment (`Stripe` or `Regional`), set at the time the `Payment` is created based on the consultant's `Country`. This is what tells the system whether to expect a Stripe webhook or a regional-gateway webhook for a given payment, and whether a `PayoutLedgerEntries` row should exist for it.
+
+### `PayoutLedgerEntries` — Manual Payout Tracking (added v1.6)
+
+Exists only for payments where `Provider = Regional` — there is no automatic Stripe-style transfer to reconcile against, so the platform tracks what it owes each consultant explicitly.
+
+- `ConsultantId` / `PaymentId` → which consultant is owed money, and for which specific payment.
+- `AmountOwed` / `Currency` → the consultant's 80% share, in the original charge currency (README §3.3.1 — never converted to USD for this calculation).
+- `Status` → `Pending`, `Paid`, or `Refunded`. `Refunded` is set if the underlying `Payment` is refunded before this entry was settled — the row is kept (not deleted) as an audit record. A refund arriving *after* an entry is already `Paid` is a clawback scenario (the consultant already received money for a now-refunded appointment) and requires manual admin reconciliation — the system does not attempt to resolve this automatically.
+- `SettledAt` / `SettledByAdminUserId` → set when an admin confirms the bank transfer was actually made, via the minimal Admin Dashboard (README §3.3.2). This is a manual confirmation, not an automated payment event — there is no webhook for a bank transfer the platform itself initiates outside the system.
+
+**Not created at all for `Provider = Stripe` payments** — those are paid out automatically via Stripe Connect and never touch this table.

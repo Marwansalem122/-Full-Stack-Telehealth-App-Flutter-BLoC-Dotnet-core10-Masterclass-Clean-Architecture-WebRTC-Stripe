@@ -665,6 +665,16 @@ X-RateLimit-Remaining: 0
 
 ---
 
+## 8.5. FCM Device Token Security
+
+FCM device tokens (`UserDeviceTokens`) are **not authentication credentials** — they are delivery addresses. However, they require basic protection:
+
+- **Token storage:** Stored in plaintext (not hashed). Unlike refresh tokens or reset tokens, FCM tokens are not secrets — they are identifiers that FCM itself issues and can invalidate. Hashing them would prevent the backend from sending pushes.
+- **Scope:** A token is only valid for push notifications to that specific device. It cannot be used to authenticate as the user or access their data.
+- **Revocation:** On logout, the token is deleted from `UserDeviceTokens`. If a token is compromised (e.g., device stolen), the user can log out from any other device to invalidate it.
+- **Rotation:** FCM tokens rotate automatically (app reinstall, token refresh). The backend handles replacement via `POST /notifications/device-token`.
+- **No sensitive data in FCM payload:** The FCM message contains only `type`, `appointmentId`, and a display title/body. No PHI (Protected Health Information) is sent via FCM. If the user taps the notification, the app fetches full details via authenticated API call.
+
 ## 9. Out of Scope (v1) — Security
 
 - **2FA/MFA** — v2 (TOTP/SMS)

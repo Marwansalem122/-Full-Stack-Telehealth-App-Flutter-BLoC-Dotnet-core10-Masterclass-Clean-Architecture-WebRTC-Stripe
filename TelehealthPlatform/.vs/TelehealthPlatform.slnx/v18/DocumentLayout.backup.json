@@ -3,60 +3,12 @@
   "WorkspaceRootPath": "D:\\Telehealth App\\TelehealthPlatform\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{29387A1E-EAAD-5AB6-0356-5C63561CEF4F}|src\\TelehealthPlatform.Api\\TelehealthPlatform.Api.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{29387A1E-EAAD-5AB6-0356-5C63561CEF4F}|src\\TelehealthPlatform.Api\\TelehealthPlatform.Api.csproj|solutionrelative:src\\telehealthplatform.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\entities\\payoutledgerentry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\entities\\payoutledgerentry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\persistence\\configurations\\refreshtokenconfiguration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\persistence\\configurations\\refreshtokenconfiguration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\persistence\\configurations\\failedloginattemptconfiguration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\persistence\\configurations\\failedloginattemptconfiguration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\persistence\\configurations\\passwordresettokenconfiguration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\persistence\\configurations\\passwordresettokenconfiguration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\persistence\\repositories\\failedloginattemptrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\persistence\\repositories\\failedloginattemptrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\persistence\\repositories\\passwordresettokenrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\persistence\\repositories\\passwordresettokenrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\persistence\\repositories\\refreshtokenrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\persistence\\repositories\\refreshtokenrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\persistence\\repositories\\consultantprofilerepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\persistence\\repositories\\consultantprofilerepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\persistence\\repositories\\patientprofilerepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\persistence\\repositories\\patientprofilerepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\persistence\\repositories\\userrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\persistence\\repositories\\userrepository.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\email\\consoleemailservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\email\\consoleemailservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\common\\unitofwork.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\common\\unitofwork.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\common\\systemdatetimeprovider.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\common\\systemdatetimeprovider.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.infrastructure\\security\\jwttokengenerator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{73317127-098E-5858-847C-2BABF087F927}|src\\TelehealthPlatform.Infrastructure\\TelehealthPlatform.Infrastructure.csproj|solutionrelative:src\\telehealthplatform.infrastructure\\security\\jwttokengenerator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\enums\\payoutledgerstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\enums\\payoutledgerstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -79,184 +31,27 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "Program.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Api\\Program.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Api\\Program.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Api\\Program.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Api\\Program.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABYAAAA2AAAAAAAAAA==",
+              "Title": "PayoutLedgerEntry.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\PayoutLedgerEntry.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Entities\\PayoutLedgerEntry.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\PayoutLedgerEntry.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Entities\\PayoutLedgerEntry.cs",
+              "ViewState": "AgIAACkAAAAAAAAAAAAqwD4AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:24:59.997Z",
+              "WhenOpened": "2026-09-07T08:18:34.912Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "RefreshTokenConfiguration.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\RefreshTokenConfiguration.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\RefreshTokenConfiguration.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\RefreshTokenConfiguration.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\RefreshTokenConfiguration.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABYAAAABAAAAAAAAAA==",
+              "Title": "PayoutLedgerStatus.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\PayoutLedgerStatus.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Enums\\PayoutLedgerStatus.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\PayoutLedgerStatus.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Enums\\PayoutLedgerStatus.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:24:32.9Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "FailedLoginAttemptConfiguration.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\FailedLoginAttemptConfiguration.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\FailedLoginAttemptConfiguration.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\FailedLoginAttemptConfiguration.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\FailedLoginAttemptConfiguration.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:24:17.224Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
-              "Title": "PasswordResetTokenConfiguration.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\PasswordResetTokenConfiguration.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\PasswordResetTokenConfiguration.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\PasswordResetTokenConfiguration.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Configurations\\PasswordResetTokenConfiguration.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABEAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:23:54.172Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 4,
-              "Title": "FailedLoginAttemptRepository.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\FailedLoginAttemptRepository.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\FailedLoginAttemptRepository.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\FailedLoginAttemptRepository.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\FailedLoginAttemptRepository.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABAAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:23:22.696Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 5,
-              "Title": "PasswordResetTokenRepository.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\PasswordResetTokenRepository.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\PasswordResetTokenRepository.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\PasswordResetTokenRepository.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\PasswordResetTokenRepository.cs",
-              "ViewState": "AgIAAAMAAAAAAAAAAAAAAAwAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:21:33.258Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 6,
-              "Title": "RefreshTokenRepository.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\RefreshTokenRepository.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\RefreshTokenRepository.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\RefreshTokenRepository.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\RefreshTokenRepository.cs",
-              "ViewState": "AgIAAAMAAABgZmZmZmYkwB8AAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:20:56.045Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 7,
-              "Title": "ConsultantProfileRepository.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\ConsultantProfileRepository.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\ConsultantProfileRepository.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\ConsultantProfileRepository.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\ConsultantProfileRepository.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:20:16.665Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 8,
-              "Title": "PatientProfileRepository.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\PatientProfileRepository.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\PatientProfileRepository.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\PatientProfileRepository.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\PatientProfileRepository.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:19:47.346Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 9,
-              "Title": "UserRepository.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\UserRepository.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\UserRepository.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\UserRepository.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Persistence\\Repositories\\UserRepository.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:18:27.888Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 10,
-              "Title": "ConsoleEmailService.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Email\\ConsoleEmailService.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Email\\ConsoleEmailService.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Email\\ConsoleEmailService.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Email\\ConsoleEmailService.cs",
-              "ViewState": "AgIAAAMAAAAAAAAAAAAAABoAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:17:41.645Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 11,
-              "Title": "UnitOfWork.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Common\\UnitOfWork.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Common\\UnitOfWork.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Common\\UnitOfWork.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Common\\UnitOfWork.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:16:40.057Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 12,
-              "Title": "SystemDateTimeProvider.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Common\\SystemDateTimeProvider.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Common\\SystemDateTimeProvider.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Common\\SystemDateTimeProvider.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Common\\SystemDateTimeProvider.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAABAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T18:16:05.808Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 13,
-              "Title": "JwtTokenGenerator.cs",
-              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Security\\JwtTokenGenerator.cs",
-              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Infrastructure\\Security\\JwtTokenGenerator.cs",
-              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Infrastructure\\Security\\JwtTokenGenerator.cs",
-              "RelativeToolTip": "src\\TelehealthPlatform.Infrastructure\\Security\\JwtTokenGenerator.cs",
-              "ViewState": "AgIAABUAAAAAODMzMzPjvyoAAAAoAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-29T17:56:37.88Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-07T08:17:22.726Z"
             }
           ]
         }

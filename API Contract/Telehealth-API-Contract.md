@@ -2,7 +2,7 @@
 
 **System Design Series · Document 4 of 4** (ERD → Architecture → Sequence Diagrams → **API Contract**)
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
-**Status:** v6 — replaced PatientProfiles.HealthInfo string with structured HealthProfile value object (height, weight, blood type, allergies, chronic conditions, medications) (cancellation >24h triggers Stripe refund, confirmed by webhook; earnings exclude refunded payments) (Forgot/Reset Password, Email Verification, Change Password, Password Policy), aligned with Security Deep-Dive Document 5.
+**Status:** v8 — synced with README v20 / ERD v1.7: fixed stale "no Admin role" note (Admin now exists in `UserRole`, exempt from XOR by design, never self-registrable); added `POST /consultants/me/stripe-onboarding` + `GET /consultants/me/stripe-onboarding-status` (Stripe path only) with a booking precondition; `providerFees` in the earnings endpoint now reflects actual recorded `Payment.ProviderFee`, not an estimated percentage.
 
 ---
 
@@ -101,18 +101,27 @@ Two distinct headers are used for two distinct purposes — don't conflate them 
 | GET | `/consultants` | ✓ | Search verified consultants by specialty |
 | GET | `/consultants/{id}/availability` | ✓ | Get bookable slots (converted to caller's local time) |
 | PUT | `/consultants/me/availability` | ✓ (Consultant) | Set weekly availability |
-| GET | `/consultants/me/earnings` | ✓ (Consultant) | Get earnings/payout summary |
+| GET | `/consultants/me/earnings` | ✓ (Consultant) | Get earnings/payout summary (provider-aware, see full detail below) |
+| POST | `/consultants/me/stripe-onboarding` | ✓ (Consultant) | Create/resume Stripe Connect KYC onboarding *(Stripe path only)* |
+| GET | `/consultants/me/stripe-onboarding-status` | ✓ (Consultant) | Check Stripe KYC completion status *(Stripe path only)* |
+| POST | `/consultants/me/payout` | ✓ (Consultant) | Instant payout *(Stripe path only, optional)* |
 | POST | `/appointments` | ✓ (Patient) | Book an appointment *(full detail below)* |
 | GET | `/appointments/{id}` | ✓ | Get appointment details |
 | GET | `/appointments` | ✓ | List own appointments |
 | POST | `/appointments/{id}/cancel` | ✓ | Cancel an appointment |
-| POST | `/webhooks/stripe` | Stripe signature | Payment confirmation *(full detail below)* |
+| POST | `/webhooks/stripe` | Stripe signature | Payment confirmation — Stripe path *(full detail below)* |
+| POST | `/webhooks/regional` | Regional gateway signature | Payment confirmation — Regional path (Paymob/PayTabs); same atomicity pattern as the Stripe webhook, different signature scheme per provider |
 | POST | `/consultations/{appointmentId}/complete` | ✓ (Consultant) | Mark consultation complete, trigger AI summary |
 | GET | `/consultations/{appointmentId}` | ✓ | Get consultation details + AI summary (if ready) |
 | GET | `/appointments/{id}/messages` | ✓ | Get chat history for an appointment |
 | POST | `/ai/symptom-check` | ✓ (Patient) | Get AI-suggested specialty from symptoms |
 | GET | `/notifications` | ✓ | List own notifications |
 | POST | `/notifications/{id}/read` | ✓ | Mark a notification read |
+| POST | `/notifications/device-token` | ✓ | Register FCM device token |
+| DELETE | `/notifications/device-token` | ✓ | Unregister FCM device token |
+| GET | `/admin/payout-ledger` | ✓ (Admin) | List pending payouts, grouped by consultant *(v1.5)* |
+| POST | `/admin/payout-ledger/settle` | ✓ (Admin) | Confirm a consultant's payout batch as paid *(v1.5)* |
+| POST | `/admin/consultants/{id}/verify` | ✓ (Admin) | Verify a consultant profile *(v1.5)* |
 
 **SignalR Hub** (`/hubs/telehealth`) — see Section 5.
 
@@ -463,9 +472,26 @@ Flutter calls this on registration/change-password screens to display requiremen
 
 **Behavior:** `PUT` replaces the entire `healthProfile` object (same full-replace semantics as other v1 endpoints). Sending `healthProfile: null` clears all health data. Sending `healthProfile: {}` with all nulls keeps the object but clears all fields.
 
-**`GET /consultants/me`** / **`PUT /consultants/me`** — same pattern. `IsVerified` is **read-only** via this endpoint — it's only ever flipped by direct DB update in v1 (Requirements §3.1), never through a client-facing field.
+**`GET /consultants/me`** / **`PUT /consultants/me`** — same pattern. `IsVerified` is **read-only** via this endpoint — set only via `POST /admin/consultants/{id}/verify` (Admin section below), never through a client-facing field on this endpoint.
 
-> **⚠️ `timeZoneId` is required for consultants.** The `PUT /consultants/me` request must include a valid IANA timezone ID (e.g., `"Africa/Cairo"`, `"Asia/Riyadh"`). While the field is technically optional in the request body (to allow partial updates of other fields), the consultant **cannot** set availability until `timeZoneId` is populated. See `PUT /consultants/me/availability` below.
+> **⚠️ `timeZoneId` and `country` are both required for consultants.** The `PUT /consultants/me` request must include a valid IANA timezone ID (e.g., `"Africa/Cairo"`, `"Asia/Riyadh"`) and an ISO country code (e.g., `"EG"`, `"SA"`, `"AE"`). While both fields are technically optional in the request body (to allow partial updates of other fields), the consultant **cannot** set availability until `timeZoneId` is populated, and **cannot receive bookings/payments** until `country` is populated — `country` is what routes the consultant's `Payment` records to `IPaymentProvider.Stripe` or `IPaymentProvider.Regional` (README §3.3.1). Missing `country` at booking time is a `409` (`type: ".../errors/consultant-country-not-set"`), not a silent default.
+
+**`POST /consultants/me/stripe-onboarding`** *(Stripe path only — README §3.3.3)*
+```json
+// Request: empty body
+// Response 200
+{ "onboardingUrl": "https://connect.stripe.com/setup/e/acct_.../..." }
+```
+Creates a Stripe Connect Express account for this consultant if one doesn't exist yet (`ConsultantProfile.StripeConnectAccountId` set on first call), and returns a fresh onboarding URL for Stripe's hosted KYC flow. Returns `409` (`type: ".../errors/regional-provider-no-onboarding"`) if `ConsultantProfile.Country` routes through `IPaymentProvider.Regional` — there is no Stripe onboarding concept on that path at all.
+
+**`GET /consultants/me/stripe-onboarding-status`** *(Stripe path only)*
+```json
+// Response 200
+{ "complete": false, "requirementsOutstanding": ["individual.verification.document", "external_account"] }
+```
+Reflects Stripe's own `requirements` object for the connected account (via `GET /v1/accounts/{id}`) — `complete` mirrors `ConsultantProfile.StripeOnboardingComplete`, which is updated by a webhook (`account.updated`) when Stripe confirms all requirements are satisfied, not polled synchronously on every call to this endpoint.
+
+> **⚠️ Booking precondition:** `POST /appointments` for a Stripe-path consultant checks `StripeOnboardingComplete = true` before allowing the booking. Returns `409` (`type: ".../errors/consultant-onboarding-incomplete"`) otherwise — a patient should never be able to pay into a consultant account that can't yet receive a payout.
 
 **`GET /consultants?specialty=Cardiology&page=1`** — public-to-authenticated search, returns only `IsVerified = true` consultants.
 ```json
@@ -516,16 +542,52 @@ Replaces the full weekly schedule (simplest correct semantics for v1 — no part
 
 **`GET /consultants/me/earnings`**
 ```json
-// Response 200
+// Response 200 — Stripe path (e.g. Saudi Arabia)
 {
-  "totalEarnings": 1500.00,
-  "currency": "USD",
+  "currency": "SAR",
+  "provider": "Stripe",
+  "totalGrossEarnings": 5625.00,
+  "platformCommissionRate": 0.20,
+  "platformCommissionAmount": 1125.00,
+  "netEarnings": 4500.00,
+  "providerFees": 168.75,
+  "finalPayout": 4331.25,
   "completedPaidConsultations": 10,
   "refundedConsultations": 2,
-  "pendingPayout": 500.00
+  "pendingPayout": 1875.00,
+  "nextPayoutDate": "2026-09-07T00:00:00Z",
+  "minimumPayoutThreshold": 190.00
 }
 ```
-Aggregates from `Payments` where `Status = Paid` AND (`RefundStatus IS NULL` OR `RefundStatus != Succeeded`) and the associated appointment's consultant is the caller. **Refunded appointments are excluded from earnings.** `refundedConsultations` counts appointments that were paid then refunded. `pendingPayout` counts completed consultations whose payment is still in Stripe's hold period (exact payout timing is a Stripe/platform detail, not a v1 design concern).
+```json
+// Response 200 — Regional path (e.g. Egypt)
+{
+  "currency": "EGP",
+  "provider": "Regional",
+  "totalGrossEarnings": 15000.00,
+  "platformCommissionRate": 0.20,
+  "platformCommissionAmount": 3000.00,
+  "netEarnings": 12000.00,
+  "providerFees": 300.00,
+  "finalPayout": 11700.00,
+  "completedPaidConsultations": 10,
+  "refundedConsultations": 2,
+  "pendingLedgerAmount": 4500.00,
+  "settlementMethod": "manual"
+}
+```
+**Calculation (identical logic on both paths, computed entirely in `Payment.Currency` — never converted to USD):**
+- `totalGrossEarnings` = SUM(`Payments.Amount`) where `Status = Paid` AND `RefundStatus != Succeeded`, grouped by `Currency` — if a consultant somehow has payments in more than one currency (shouldn't normally happen given `Country` is fixed per profile), this endpoint returns the primary/only currency in use; multi-currency aggregation is not a v1 concern.
+- `platformCommissionAmount` = `totalGrossEarnings` × `platformCommissionRate` (20%, README §3.3.1)
+- `netEarnings` = `totalGrossEarnings` − `platformCommissionAmount`
+- `providerFees` = `SUM(Payment.ProviderFee)` — the **actual** fee amount recorded on each `Payment` from the provider's own reporting (README §3.3.4), not an estimated percentage formula. Populated by `RecordProviderFee` when the provider reports it (Stripe: via the balance transaction linked to the `PaymentIntent`, typically shortly after the webhook fires — see the timing note in README §3.3.4). Until that value is recorded for a given payment, it contributes `0` to this sum rather than an estimate, meaning `providerFees` can under-report by a small, self-correcting margin for very recently paid appointments — acceptable for v1, not treated as a bug.
+- `finalPayout` = `netEarnings` − `providerFees`
+- **Stripe path:** `pendingPayout` = amount accumulated in the Stripe Connect balance not yet transferred; `nextPayoutDate` = next Monday 00:00 UTC; `minimumPayoutThreshold` is looked up per-currency (README §3.3.1 — never a flat USD figure converted on the fly).
+- **Regional path:** `pendingLedgerAmount` = SUM(`PayoutLedgerEntries.AmountOwed`) where `Status = Pending` for this consultant; `settlementMethod` is always `"manual"` — there is no automatic schedule to report.
+
+**Payout schedule:**
+- **Stripe path:** automatic weekly transfer (Mondays, 00:00 UTC) to the consultant's linked bank account, subject to that currency's minimum threshold.
+- **Regional path:** no automatic schedule. Settlement happens when an admin confirms a bank transfer via the Admin Dashboard (Section "Admin" below) and marks the relevant `PayoutLedgerEntries` as `Paid`.
 
 ---
 
@@ -613,10 +675,27 @@ Server-side check: `409` when `Now() > ScheduledStartUtc - 24h`. Treated as a `4
 {
   "suggestedSpecialty": "Neurology",
   "keyPoints": ["..."],
-  "disclaimer": "This is not a medical diagnosis. Consult a specialist."
+  "disclaimer": "This is not a medical diagnosis. Consult a specialist.",
+  "recommendedConsultants": [
+    {
+      "consultantId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "name": "Dr. Ahmed Hassan",
+      "specialty": "Neurology",
+      "bio": "Board-certified neurologist with 10+ years experience...",
+      "isVerified": true
+    }
+  ]
 }
 ```
+**How it works:**
+1. LLM analyzes symptoms → returns suggested specialty.
+2. Backend queries `ConsultantProfiles` where `Specialty = suggestedSpecialty` AND `IsVerified = true`.
+3. Returns up to 5 matching consultants (v1: random shuffle within matched set; v2: ranked by ratings/experience).
+4. Patient can tap a consultant to go directly to booking.
+
 Rate-limited (Requirements §3.5 — 10 requests/minute/user). `429 Too Many Requests` on limit exceeded. Synchronous — unlike consultation summaries, symptom-checking has no persisted job/context, so there's nothing to make async.
+
+> **⚠️ Privacy:** The LLM prompt includes only the symptom description. Patient identity (name, email, health profile) is **never** sent to the LLM.
 
 ---
 
@@ -633,6 +712,81 @@ Rate-limited (Requirements §3.5 — 10 requests/minute/user). `429 Too Many Req
 ```
 
 **`POST /notifications/{id}/read`** → `204 No Content`.
+
+**`POST /consultants/me/payout`** *(v1 minimal — optional, Stripe path only)*
+```json
+// Request: empty body
+// Response 200
+{
+  "amount": 150.00,
+  "currency": "SAR",
+  "status": "Initiated",
+  "estimatedArrival": "2026-09-02T12:00:00Z"
+}
+```
+Requests an **instant payout** outside the weekly schedule. Stripe fee: 1% of amount (max, in the local currency, equivalent to Stripe's cap for that currency — not a flat $10 assumed across currencies). Only available if consultant balance exceeds that currency's minimum threshold. Returns `409 Conflict` if balance is below threshold, if the Stripe Connect account isn't fully onboarded (KYC incomplete), or **if `ConsultantProfile.Country` routes through the Regional provider** — there is no instant-payout equivalent on that path; the response in that case is `409` with `type: ".../errors/instant-payout-not-supported"`.
+
+> **⚠️ v1 note:** This endpoint is optional and Stripe-path-only. The weekly automatic payout is the primary mechanism on that path. Instant payout can be deferred to v2 if implementation complexity is high. The Regional path has no equivalent — its only settlement mechanism is the manual Admin Dashboard flow below.
+
+---
+
+### Admin *(v1.5 — minimal scope, README §3.3.2)*
+
+Endpoints in this section require an `Admin` role. **v1 has no self-service admin registration** — `Admin` exists as a `UserRole` value (README §3.1/ERD §Users.Role — added v1.7) but is never reachable via `POST /auth/register`, which only accepts `Patient`/`Consultant` (validated explicitly, not just undocumented). Admin `User` rows are provisioned directly in the database. An Admin has no `ConsultantProfile` or `PatientProfile` row — this is consistent with, not an exception to, the Patient/Consultant mutual-exclusivity rule, since Admin was never part of that either-or.
+
+**`GET /admin/payout-ledger?status=Pending&page=1`**
+```json
+{
+  "items": [
+    {
+      "consultantId": "...",
+      "consultantName": "...",
+      "currency": "EGP",
+      "totalOwed": 4500.00,
+      "entryCount": 3
+    }
+  ],
+  "page": 1, "pageSize": 20, "totalCount": 12
+}
+```
+Grouped by consultant + currency (README §3.3.2) — an admin settles one consultant's accumulated balance at a time, not individual `PayoutLedgerEntries` rows one by one.
+
+**`POST /admin/payout-ledger/settle`**
+```json
+// Request
+{ "consultantId": "...", "currency": "EGP" }
+// Response 200
+{ "settledCount": 3, "settledAmount": 4500.00, "settledAt": "2026-09-02T10:00:00Z" }
+```
+Marks every `Pending` `PayoutLedgerEntry` for that consultant/currency pair as `Paid`, stamped with `SettledByAdminUserId` and `SettledAt`. This is a **confirmation that a bank transfer already happened outside the system** — this endpoint does not itself move any money.
+
+**`POST /admin/consultants/{id}/verify`** → `204 No Content`.
+Sets `ConsultantProfile.IsVerified = true`. Replaces the direct-DB-edit approach from earlier design documents with an actual audited action (matches README §3.3.2's decision to give manual verification a UI instead of requiring DB access).
+
+**`POST /notifications/device-token`**
+```json
+// Request
+{
+  "token": "fcm-device-token-from-flutter-firebase-messaging",
+  "platform": "android" // or "ios"
+}
+// Response 204 No Content
+```
+Called by Flutter after obtaining the FCM token from `FirebaseMessaging.instance.getToken()`. The backend stores the token in `UserDeviceTokens` (unique per user + platform). Multiple devices per user are supported (e.g., phone + tablet). Tokens are updated on every app launch (idempotent — same token = no-op, new token = replace old).
+
+**`DELETE /notifications/device-token`**
+```json
+// Request
+{ "token": "fcm-device-token" }
+// Response 204 No Content
+```
+Called on logout or when the user disables push notifications. Removes the token from `UserDeviceTokens`.
+
+> **⚠️ Dual-channel delivery:** When a notification-worthy event occurs (e.g., appointment confirmed), the backend:
+> 1. Persists the `Notification` record.
+> 2. Sends via **SignalR** if the user is connected (in-app real-time).
+> 3. Sends via **FCM** to all registered device tokens (background/closed app).
+> SignalR and FCM are independent — if SignalR fails, FCM still delivers; if FCM fails, SignalR still delivers. The user sees the notification via whichever channel reaches them first.
 
 ---
 
@@ -683,7 +837,7 @@ Same rejection pattern as `JoinCall` — validation failures return a method-lev
 
 Consistent with the same "don't add what v1 doesn't need" principle used throughout this series (Architecture Document, Section 15):
 
-- No `Admin` endpoints — verification is a manual DB update in v1 (Requirements §3.1).
+- No *general-purpose* Admin endpoints beyond the v1.5 minimal scope (payout ledger review/settlement, consultant verification — see the Admin section above) — full analytics/reporting/user-management stays deferred to v2 (README §3.3.2, Architecture Document §15).
 - No push-notification device-registration endpoint — FCM is v2 (Requirements §3.6).
 - No file/attachment upload endpoints — Storage is explicitly deferred (Requirements §3.5 / Architecture §19).
 - No `PATCH` partial-update semantics — `PUT` replaces the full resource everywhere in v1, which is simpler to reason about and sufficient at this scale.

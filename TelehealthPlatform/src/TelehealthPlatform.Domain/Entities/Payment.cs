@@ -18,7 +18,8 @@ public class Payment : Entity
     public DateTime? RefundedAtUtc { get; private set; }
 
     public Appointment Appointment { get; private set; } = default!;
-
+    public decimal? ProviderFee { get; private set; }   // الرسوم الفعلية زي ما رجعتها Stripe/Regional
+    public decimal? NetAmount { get; private set; }      // Amount - ProviderFee
     private Payment() { }
 
     public static Payment CreatePending(Guid appointmentId, decimal amount, string currency, string idempotencyKey, DateTime nowUtc)
@@ -70,4 +71,9 @@ public class Payment : Entity
     /// <summary>Earnings query (GET /consultants/me/earnings) excludes
     /// refunded payments — API Contract v3 / README refund policy.</summary>
     public bool CountsTowardEarnings => Status == PaymentStatus.Paid && RefundStatus != PaymentRefundStatus.Succeeded;
+    public void RecordProviderFee(decimal fee)
+    {
+        ProviderFee = fee;
+        NetAmount = Amount - fee;
+    }
 }

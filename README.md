@@ -2,7 +2,7 @@
 
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC) + Native SDK Layer (Kotlin/Android, Swift/iOS via Platform Channels)
 **Owner:** Marwan
-**Status:** Draft v18 — replaced PatientProfiles.HealthInfo string with HealthProfile structured value object (height, weight, blood type, allergies, chronic conditions, medications) (consultant/patient cancellation >24h triggers Stripe refund, earnings exclude refunded payments) (Kotlin/Android + Swift/iOS via Platform Channels), updated Architecture and Sequence Diagrams (Forgot/Reset Password, Email Verification, Change Password, Password Policy, Refresh Token Rotation/Reuse Detection, Account Lockout/Brute-force Protection). All five design documents are now mutually consistent.
+**Status:** Draft v21 — added a deferred v2 note on app version gating / staged rollout strategy (Play/App Store + Shorebird), scoped to activate only if a concrete operational need arises; fixed a stale duplicate "Push notifications (FCM)" entry left in the Later (v2+) list after FCM was already moved to v1 in the Out of Scope section.
 
 ---
 
@@ -43,6 +43,14 @@ A full-stack Telehealth platform that connects patients with medical consultants
 > **⚠️ Mutual exclusivity — a `User` must be a Patient XOR a Consultant, never both:** The ERD models `Users`→`ConsultantProfiles` and `Users`→`PatientProfiles` as two separate optional one-to-one relationships. That correctly stops a user from having *two* Consultant Profiles, but nothing in the relationship itself stops a user from having *both* a Consultant Profile *and* a Patient Profile — most RDBMS (including SQL Server) don't support a plain CHECK constraint spanning two different tables.
 > - **Primary enforcement (application layer):** `Users.Role` is set once at registration and treated as **immutable**. The `CreateConsultantProfile` command handler rejects the request unless `User.Role == Consultant`; `CreatePatientProfile` mirrors this for `Role == Patient`. As long as `Role` never changes after registration, this alone guarantees exclusivity.
 > - **Optional defense-in-depth (DB layer):** A database trigger on insert into either profile table that verifies no row exists for the same `UserId` in the other table — a safety net against an application-layer bug, useful as a learning exercise even if not strictly required for v1.
+>
+> **⚠️ Known limitation (v1):** A consultant who gets sick and wants to book an appointment with another doctor **cannot** do so using the same account. They would need a separate email/phone to register as a patient. This is a deliberate v1 simplification. v2 can relax this constraint by:
+> - Allowing users to have *both* profiles (Patient + Consultant)
+> - Or creating a "switch role" feature
+> - Or adding a "book for myself" option in the consultant dashboard that creates a temporary patient context
+> For v1, the XOR rule stands to keep the authorization model simple.
+>
+> **✅ Resolved: a third `UserRole` value, `Admin`, exists alongside `Patient`/`Consultant` — explicitly exempt from the XOR rule above.** An Admin has **neither** a `ConsultantProfile` nor a `PatientProfile` — the XOR rule (Patient *or* Consultant, never both) only ever applied between those two; it says nothing about Admin, which isn't part of that either/or in the first place. Admin accounts are **never self-registered** — `POST /auth/register` rejects any `role` value other than `"Patient"`/`"Consultant"` (the validator's `Must(r => r is "Patient" or "Consultant")` check makes `Admin` structurally unreachable through that endpoint), and an Admin `User` row is provisioned directly in the database (Section 3.3.2). `RegisterCommandHandler`'s profile-creation branch (Patient → `PatientProfile`, else → `ConsultantProfile`) is therefore never exercised for an Admin, since no code path can produce one.
 
 ### 3.2 Scheduling & Booking
 - As a Consultant, I want to set my weekly availability (recurring time windows, e.g. Mon 09:00–13:00, **in my own timezone**), so that patients can only book free slots.
@@ -183,7 +191,7 @@ But v1 must have a **deterministic rule** — not a hanging state. The backgroun
 - As a system, I want to create a Stripe PaymentIntent when a booking starts, so that payment can be tracked end-to-end.
 - As a system, I want to verify payment success **only via Stripe Webhooks** (never trust the Flutter client's claim that payment succeeded), so that appointment status updates reliably and securely.
 - As a system, I want to send an **Idempotency-Key** on the Stripe PaymentIntent creation call — the *same* key as `Appointment.IdempotencyKey` (Section 3.2), not a separately generated one — so that a network retry from the client can't create a duplicate PaymentIntent.
-- As a Consultant, I want to see my earnings/payout summary (excluding refunded appointments), so that I can track actual income.
+- As a Consultant, I want to see my earnings/payout summary (excluding refunded appointments, net of platform commission), so that I can track actual income and pending payouts.
 
 **Payment flow — ordering matters (Stripe calls should not sit inside a DB transaction, since the API call can be slow and would hold a connection/lock):**
 ```
@@ -238,6 +246,164 @@ Payment
 > ```
 > This is a single Stripe API call (`GET /v1/payment_intents/{id}`) and is safe because the `PaymentIntent` was created by this same backend (same Stripe account). This retrieval step must be explicitly documented in the API Contract for `POST /appointments` so the retry path is fully specified.
 
+### 3.3.1 Payout & Commission Policy — Explicit Rules
+
+> **⚠️ Critical gap closed, then re-closed properly:** the first version of this section assumed Stripe Connect works everywhere. It doesn't — **Stripe Connect does not support payouts to Egypt** (as of this writing), and the platform's actual go-to-market is Egypt + the Arab world first, with global expansion later. A commission policy that only works in Stripe-supported countries is not a v1-ready policy for this project. The rules below account for both paths.
+
+**Payment provider is per-consultant, chosen by country — not a single global choice:**
+
+```
+Booking / Payment Command
+        ↓
+   IPaymentProvider (abstraction)
+        ↓
+ConsultantProfile.Country determines the concrete provider:
+        │
+        ├── Stripe-supported country (Saudi Arabia, UAE, US, EU, ...)
+        │       → StripeConnectPaymentProvider
+        │       → automatic split + weekly automatic bank payout
+        │
+        └── Stripe-unsupported country (Egypt, ...)
+                → RegionalPaymentProvider (e.g. Paymob or PayTabs for card/wallet collection)
+                → platform collects the full amount into its own merchant account
+                → consultant's 80% share is recorded as a PayoutLedgerEntry (owed, not yet paid)
+                → payout settled manually via bank transfer, approved through the Admin Dashboard (see Section 3.3.2)
+```
+
+> **⚠️ `ConsultantProfile` needs a `Country` field — this did not previously exist anywhere in the ERD.** It's required for this routing decision and is a real gap independent of the payment discussion (patient search should arguably also filter/display by country). Add it as a required field at consultant profile completion, alongside `TimeZoneId`.
+
+**Commission structure (v1) — unchanged split, corrected calculation basis:**
+| Party | Percentage | Notes |
+|---|---|---|
+| **Consultant** | 80% | Stripe path: minus Stripe's processing fee. Regional path: minus the regional gateway's processing fee (varies by provider — Paymob/PayTabs fees are not identical to Stripe's ~2.9%+30¢ and must be looked up per provider, not assumed). |
+| **Platform** | 20% | Covers infrastructure, AI costs, payment processing |
+
+> **⚠️ The 20% is always computed on `Payment.Amount` in `Payment.Currency` — never converted to USD first.** A consultant charging in EGP has their commission computed in EGP; a consultant charging in SAR has it computed in SAR. Converting to USD before applying the percentage would make the split silently drift with exchange rate fluctuations, which is not what "20%" is supposed to mean. `Payment.Currency` is not a display detail — it's load-bearing for this calculation.
+
+**Payout schedule — diverges by provider:**
+
+*Stripe path (Saudi/UAE/etc.):*
+- Consultant earnings accumulate in their Stripe Connect balance.
+- Automatic weekly payout (Monday 00:00 UTC) to their linked bank account, in **their local payout currency** (Stripe converts automatically if the charge currency differs from the connected account's currency — this conversion is Stripe's, not something this platform calculates itself).
+- Minimum payout threshold is defined **per currency**, not as a single USD figure (e.g. a flat $50 doesn't translate meaningfully to a SAR or AED threshold by simple conversion — set each threshold deliberately for that currency's market, not via FX math).
+
+*Regional path (Egypt/etc.):*
+- No automatic payout. Each paid appointment increments a `PayoutLedgerEntry` for that consultant (owed amount, in the original charge currency).
+- An admin reviews and approves a batch payout (bank transfer initiated outside the system) via the Admin Dashboard (Section 3.3.2) — this makes the Admin Dashboard a **v1 dependency for the Egypt launch**, not a deferred v2 nice-to-have.
+- Once a transfer is confirmed, the admin marks the relevant `PayoutLedgerEntry` rows as paid.
+
+**Earnings calculation (provider-agnostic — works the same regardless of path):**
+```
+Total Earnings = SUM(Payments.Amount) WHERE Status = Paid AND RefundStatus != Succeeded
+                 — computed per Payment.Currency, never aggregated across currencies into one number
+Net Earnings   = Total Earnings × 0.80 − provider processing fees
+Pending Payout = Net Earnings − Amount already paid out (Stripe transfer OR confirmed ledger settlement)
+```
+
+**Why 80/20?**
+- v1 decision — industry standard for marketplace platforms. Applies identically regardless of provider/currency.
+- Adjustable in v2 based on consultant tier (e.g., top-rated consultants get 85%) — a per-country or per-tier rate table is a v2 concern, not a v1 one.
+
+**Refunds affect both parties:**
+- When a refund is issued (cancellation >24h or consultant no-show), the **full amount** is refunded to the patient — via Stripe's refund API on the Stripe path, or via the regional gateway's refund mechanism (or, if unsupported by that gateway, a manual reversal — this depends on which regional provider is chosen and must be verified against Paymob/PayTabs's actual refund capabilities before implementation).
+- The platform absorbs the loss (does not claw back from consultant for patient no-show; does not pay consultant for consultant no-show).
+- On the regional path, a refunded appointment must **not** have created (or must reverse) a `PayoutLedgerEntry` — the ledger and the refund state must never disagree about whether a consultant is owed money for that appointment.
+- `GET /consultants/me/earnings` excludes refunded appointments entirely, regardless of provider.
+
+### 3.3.1a Stripe Connect Onboarding (Stripe path only)
+
+> **Gap closed:** the Stripe path assumed a consultant's Stripe Connect account simply exists — nothing described how it gets created. `ConsultantProfile` gains `StripeConnectAccountId` and `StripeOnboardingComplete`. Flow:
+> ```
+> POST /consultants/me/stripe-onboarding
+>   → creates a Stripe Connect Express account for this consultant (if none exists yet)
+>   → returns an onboarding URL (Stripe-hosted KYC flow — identity, bank account)
+> GET /consultants/me/stripe-onboarding-status
+>   → checks current KYC completion via Stripe's Account API
+>   → returns { complete: true/false, requirementsOutstanding: [...] }
+> ```
+> **Regional-path consultants never see these endpoints** — they have no Stripe Connect account at all; there's nothing to onboard.
+> **Booking precondition:** `POST /appointments` must reject booking a Stripe-path consultant whose `StripeOnboardingComplete = false`, with `409 consultant-onboarding-incomplete` — an incomplete Connect account can't receive a Transfer.
+
+### 3.3.1b Provider Fee Tracking — Actual, Not Estimated
+
+> **Gap closed:** earlier drafts estimated Stripe's fee at "~2.9% + 30¢" for display in `GET /consultants/me/earnings`. That's an approximation, not what Stripe (or a regional gateway) actually charges for a given transaction — real fees vary by card type, currency, and country. `Payment` gains `ProviderFee` and `NetAmount`, populated from the provider's own reporting:
+> - **Stripe path:** when handling `payment_intent.succeeded`, fetch the associated **Balance Transaction** (Stripe's API exposes the exact fee charged for that specific charge) and record it — not a formula-based guess.
+> - **Regional path:** the regional gateway's webhook payload or settlement report supplies the equivalent figure; exact field depends on which gateway (Paymob/PayTabs) is chosen — verify against that provider's actual API before implementation.
+> `GET /consultants/me/earnings`'s `providerFees` field (Section 3.3.1) now reflects `SUM(Payment.ProviderFee)` — real numbers, not an estimate formula.
+
+### 3.3.1c Payment Failure Handling — Expiring Abandoned Bookings
+
+> **Gap closed:** if a patient's `PaymentIntent` is created but they never complete payment (closes the app, abandons checkout), the `Appointment` stays `PendingPayment` indefinitely — silently holding the slot forever, since the filtered unique index (Section 3.2) only excludes `Cancelled`/`NoShow`/`PaymentFailed`, not `PendingPayment`.
+> **`PendingPaymentExpiryBackgroundService`** (same polling-job pattern as the AI pipeline's stuck-job recovery, Section 3.5):
+> ```
+> Runs every 5 minutes
+> Finds: Appointment.Status = PendingPayment AND CreatedAtUtc < Now.AddMinutes(-30)
+> Action: Appointment.MarkPaymentFailed() → Status = PaymentFailed
+> Effect: the filtered unique index now excludes this row, freeing the slot for other patients
+> ```
+> **30 minutes is a placeholder, not a validated figure** — pick a value that matches the actual patient checkout experience once that flow exists; the mechanism matters more than the exact number for v1.
+
+### 3.3.2 Admin Dashboard — Elevated from v2 to v1.5
+
+> **Decision:** given the Regional payout path above has no automated settlement, a minimal Admin Dashboard is required before the Egypt launch can function — this is no longer a deferred "nice to have," it's a dependency of Section 3.3.1. Scope is intentionally minimal (not a full admin suite):
+> - View pending `PayoutLedgerEntry` rows, grouped by consultant.
+> - Mark a batch as paid (after the admin performs the actual bank transfer outside the system).
+> - Manual consultant verification (`ConsultantProfile.IsVerified`) — already a v1 requirement (Section 3.1) that had no UI; this gives it one instead of requiring direct DB edits.
+> - Stack: **Angular** (separate project/repo from the Flutter apps and the ASP.NET Core API — talks to the same API Contract, no special admin-only backend).
+> - Full analytics/reporting dashboards remain deferred to v2 (Architecture Document, Section 15) — this is strictly the minimum needed to make Section 3.3.1's regional path operable.
+
+### 3.3.3 Stripe Connect Onboarding (Stripe path only)
+
+A consultant routed to `IPaymentProvider.Stripe` (README §3.3.1) cannot receive payments until they complete Stripe's own KYC/bank-linking flow — this is separate from, and in addition to, the platform's own `ConsultantProfile.IsVerified` manual check (§3.1).
+
+- As a Consultant (Stripe-path country), I want to start Stripe Connect onboarding from my profile, so that I can receive payouts.
+- As a system, I want to block bookings for a Stripe-path consultant whose onboarding isn't complete, so that a payment is never taken for an appointment the platform can't actually pay out for.
+
+**Flow:**
+```
+Consultant → POST /consultants/me/stripe-onboarding
+        ↓
+API creates a Stripe Connect Express account (if none exists yet)
+        ↓
+Returns a Stripe-hosted onboarding URL (KYC, bank account linking)
+        ↓
+Consultant completes onboarding on Stripe's site
+        ↓
+Stripe redirects back; API polls/webhooks to confirm completion
+        ↓
+ConsultantProfile.StripeOnboardingComplete = true
+```
+
+> **⚠️ Booking-time gate:** `POST /appointments` must check `StripeOnboardingComplete` for Stripe-path consultants before creating the appointment — a `409` (`consultant-onboarding-incomplete`) if incomplete. This has no equivalent check on the Regional path (Section 3.3.1), since that path never depends on a third-party KYC flow before it can collect payment.
+
+### 3.3.4 Exact Provider Fee Tracking
+
+The original earnings calculation *estimated* Stripe's fee (~2.9% + 30¢) at query time. This is imprecise — Stripe (and regional gateways) report the **actual** fee charged per transaction via their balance-transaction data, and fees can vary (currency, card type, region).
+
+- As a system, I want to record the actual `ProviderFee` and resulting `NetAmount` on each `Payment` when the provider reports it (Stripe: from the balance transaction linked to the `PaymentIntent`; Regional: from whatever the chosen gateway's equivalent mechanism reports), so that `GET /consultants/me/earnings` reflects real numbers, not an estimate.
+- This removes the need for `GET /consultants/me/earnings` to guess at a fee percentage — it simply sums the already-recorded `ProviderFee`/`NetAmount` columns.
+
+> **⚠️ Timing:** the fee isn't known at the moment `Payment.Status` becomes `Paid` (the webhook confirms payment succeeded, but the balance-transaction fee detail is a separate Stripe API object). `RecordProviderFee` is a distinct step, called either from an expanded webhook handler (if Stripe includes the balance transaction in the event payload) or a short follow-up call to Stripe's API — this detail needs to be worked out at implementation time, not assumed.
+
+### 3.3.5 Payment Failure Handling — Expiry Cleanup
+
+`AppointmentStatus.PaymentFailed` already exists (Section 3.2), but nothing previously moved a stuck appointment into it. Without this, an appointment where the patient abandons payment mid-flow (closes the app, loses connection) stays `PendingPayment` **indefinitely**, holding the slot.
+
+- As a system, I want a background job that expires stale `PendingPayment` appointments, so that abandoned bookings don't permanently block a slot.
+
+```
+PendingPaymentExpiryBackgroundService (runs every 5 minutes)
+        ↓
+Find: Appointment.Status = PendingPayment AND CreatedAtUtc < Now - 30 minutes
+        ↓
+Appointment.MarkPaymentFailed() → Status = PaymentFailed
+        ↓
+Filtered unique index (Section 3.2) excludes PaymentFailed — slot is now bookable again automatically
+```
+
+> **⚠️ Open parameter:** the 30-minute expiry window is a placeholder, not a finalized decision — tune based on actual observed abandonment behavior once real usage data exists.
+
+
 ### 3.4 Real-time Chat & Video (WebRTC)
 - As a Patient/Consultant, I want to exchange real-time messages before/during a consultation, so that we can communicate asynchronously.
 - As a system, I want chat messages persisted to the database (not just delivered live), so that conversation history survives reconnects and is available later.
@@ -270,7 +436,7 @@ ChatMessage
 
 The AI feature is not just "call an LLM from a controller" — it's built as its own subsystem with an abstraction, provider implementation, structured prompts, validation, and failure handling. The goal is to learn production-ready AI integration patterns that transfer to any future project, not just this one.
 
-- As a Patient, I want to describe my symptoms and get a suggested specialty, so that I know which consultant to book.
+- As a Patient, I want to describe my symptoms and get AI-suggested specialties **and matching verified consultants** (ranked by relevance), so that I can book the right doctor immediately without manual searching.
 - As a system, I want to generate an automatic summary after a consultation ends, so that both parties have a record.
 - As a Consultant, I want to view the AI-generated summary attached to an appointment, so that I can review it quickly.
 - As a developer, I want the Application layer to depend on an `IAIService` abstraction (not directly on OpenAI/Azure SDKs), so that the AI provider can be swapped without touching business logic.
@@ -286,6 +452,48 @@ The AI feature is not just "call an LLM from a controller" — it's built as its
 User ──API──► AI Use Cases ──► IAIService (abstraction) ──► AI Provider
                                                               (OpenAI / Azure / etc.)
 ```
+
+#### AI Doctor Recommendation (v1)
+
+The symptom checker does not stop at suggesting a specialty. After the LLM returns the suggested specialty, the system queries the database for verified consultants matching that specialty and returns them ranked:
+
+```
+Patient describes symptoms
+        ↓
+AnalyzeSymptomsCommand → LLM
+        ↓
+Suggested Specialty (e.g., "Cardiology")
+        ↓
+Query: SELECT * FROM ConsultantProfiles
+        WHERE Specialty = "Cardiology" AND IsVerified = true
+        ORDER BY (experience_score) DESC
+        LIMIT 5
+        ↓
+Return: { specialty, consultants: [ { id, name, bio, specialty } ] }
+```
+
+**Ranking factors (v1, simple):**
+- `IsVerified = true` (hard filter — unverified doctors never appear)
+- Specialty exact match (hard filter)
+- Random shuffle within the matched set (v1 — no ratings yet since Reviews are v2)
+
+**Ranking factors (v2, richer):**
+- Average rating (Reviews table)
+- Number of completed consultations
+- Response time
+- Patient feedback keywords
+
+**API Response:**
+```json
+{
+  "suggestedSpecialty": "Cardiology",
+  "consultants": [
+    { "consultantId": "...", "name": "Dr. Ahmed", "specialty": "Cardiology", "bio": "..." }
+  ]
+}
+```
+
+> **⚠️ No PHI in AI prompt:** The symptom description is sent to the LLM, but the patient's identity (name, email, health profile) is **never** included in the prompt. The LLM only sees: "Patient reports: [symptoms]". This protects privacy and reduces liability.
 
 `IAIService` example (conceptual):
 ```csharp
@@ -371,12 +579,14 @@ The **architecture** supports both chat-based and voice-based context from day o
 - **v1:** Chat-based consultation summary, AI provider abstraction, structured output, retry/timeout/failure handling.
 - **v2:** Speech-to-Text integration, voice transcript, transcript + chat combined summary.
 
-### 3.6 Notifications *(in v1 scope, in-app only)*
+### 3.6 Notifications *(v1: SignalR + FCM Push)*
 - As a Patient/Consultant, I want to receive in-app notifications for key events, so that I stay informed without checking manually.
 - Events to cover in v1: Appointment booked, Appointment confirmed, Appointment cancelled, Appointment starting soon, Doctor joined consultation.
-- As a system, I want to deliver in-app notifications via SignalR, so that no extra infrastructure is needed for v1.
+- As a system, I want to deliver in-app notifications via **SignalR** when the app is open, so that real-time updates are instant.
+- As a system, I want to deliver **push notifications via FCM** when the app is in the background or closed, so that critical events (incoming call, appointment reminder, booking confirmation) are never missed.
 - As a Patient/Consultant, I want to see which notifications are unread, so that I can tell what's new.
-- *(Push notifications via FCM remain out of scope for v1 — see Section 7.)*
+
+> **⚠️ Why FCM in v1, not v2:** In a Telehealth app, missing an incoming call because the app was closed is a critical failure — not a UX inconvenience. SignalR alone cannot wake a closed app. FCM is required for: (1) incoming call alerts (with CallKit/ConnectionService), (2) appointment reminders, (3) booking confirmations. This is a domain-driven decision, not premature optimization.
 
 ---
 
@@ -433,20 +643,21 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
 - Authentication (Patient/Consultant)
 - Doctor Profiles (with `TimeZoneId`, `IsVerified`) / Patient Profiles
 - Availability + Appointments (30-min slots, timezone-safe, concurrency-safe)
-- Stripe payments (webhook-driven, idempotent)
+- Multi-provider payments + Payouts (Stripe Connect where supported; regional gateway + manual ledger settlement elsewhere — webhook-driven, idempotent, 80/20 commission split computed in the original charge currency, see Section 3.3.1)
 - Chat (persisted + encrypted at rest, SignalR real-time delivery)
 - SignalR + WebRTC (with STUN/TURN)
-- AI Symptom Checker (via `IAIService` abstraction, structured output, rate-limited)
+- AI Symptom Checker + **Doctor Recommendation** (via `IAIService` abstraction, structured output, rate-limited, returns verified consultants ranked by specialty match)
 - AI Consultation Summary — chat-based, async pipeline with transactional job creation and DB polling, retry/failure handling and restart recovery
-- Basic in-app notifications (SignalR)
+- In-app notifications (SignalR) + Push notifications (FCM) for critical events
 - Native SDK Layer (Kotlin/Swift) for WebRTC media pipeline, secure storage, and background call handling
+- **Payout schedule:** provider-dependent — automatic weekly (Stripe path) or manual ledger settlement via the minimal Admin Dashboard (regional path, Section 3.3.2)
+- **Minimal Admin Dashboard (v1.5)** — payout ledger review/settlement + manual consultant verification (Angular, separate project)
 
 **Later (v2+):**
-- Admin dashboard / analytics / user management (including a UI for consultant verification)
+- Full admin dashboard / analytics / user management beyond the v1.5 minimal scope
 - Reviews & ratings
 - Medical records / attachments
 - Voice transcription for AI Summary (Speech-to-Text pipeline)
-- Push notifications (FCM)
 - Call recording
 - Prescriptions
 - Insurance integration
@@ -456,6 +667,7 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
 - Full `AuditLog` table
 - Redis SignalR backplane (only if scaling beyond one instance)
 - Richer `RefreshToken` fields for multi-device session management (`DeviceId`, `UserAgent`, `IpAddress`, `RevokedReason`)
+- App version gating / staged rollout strategy (Play Store staged rollout, App Store phased release, Shorebird tracks for Dart hotfixes) — deferred until a concrete operational need arises (e.g. a critical WebRTC bug requiring forced update for affected client versions)
 
 ---
 
@@ -468,7 +680,7 @@ Explicitly *not* building initially:
 - [x] ~~Complex refund/cancellation policies~~ — **MOVED TO v1** (simple auto-refund >24h before appointment)
 - [ ] Group video calls (one-to-one only)
 - [ ] Insurance/claims integration
-- [ ] Push notifications (FCM) — in-app only via SignalR for v1
+- [x] ~~Push notifications (FCM)~~ — **MOVED TO v1** (required for Telehealth: incoming calls, reminders, confirmations)
 - [ ] Speech-to-Text / voice transcription for AI Summary — architecture supports it, but implementation deferred to v2 (chat-based summary only for v1)
 - [ ] Full audit log table (basic `CreatedAt`/`ModifiedAt` + soft delete support only in v1)
 - [ ] SignalR Redis backplane (single-instance only in v1)
@@ -607,7 +819,9 @@ class WebRTCNativePlugin: NSObject, FlutterPlugin {
 - **Consultant Verification (v1):** `IsVerified` boolean, manually flipped in the database for now — no admin UI needed until v2.
 - **AI Summary cardinality — one final summary per consultation in v1:** `Consultation → 0..1 AISummary` is a deliberate decision, not just a default cardinality. `AIJob` already models retries as a single row with an incrementing `RetryCount` (not one row per attempt), so only the successful attempt ever persists an `AISummary`. If a future version needs to keep a history of summaries across different prompt versions or providers (true versioning, not retry), this relationship would need to change to `Consultation → 0..* AISummary` with an `IsCurrent`/`GeneratedAt` marker to identify the latest — that's an explicit v2 schema change, not something v1 needs to accommodate now.
 - **RefreshToken fields (v1 minimal set):** `UserId`, `TokenHash`, `ExpiresAt`, `CreatedAt`, `RevokedAt` — sufficient for v1. Richer fields (`DeviceId`, `UserAgent`, `IpAddress`, `RevokedReason`) are useful for multi-device session management and audit trails, but are a deliberate v2 addition, not required to ship v1 securely.
+- **Admin Dashboard Stack (v2):** ✅ Angular (not Flutter Web). Admin dashboards are web-only, data-heavy, and benefit from Angular's reactive forms, routing, and rich component ecosystem. The user is already learning Angular, making this a natural fit. Flutter Web is not suitable for complex admin UIs with data tables, charts, and complex forms.
 - **Native SDK Layer:** ✅ Added as v1 component. Flutter handles UI + business logic; Kotlin (Android) and Swift (iOS) handle platform-specific capabilities (WebRTC media pipeline, hardware crypto, CallKit/ConnectionService) via Platform Channels. Domain Layer remains 100% Dart with interface abstractions.
+- **Push Notifications (FCM):** ✅ Moved to v1. SignalR handles in-app real-time; FCM handles background/closed-app delivery. Both channels are triggered from the same `INotificationService` abstraction. Device tokens are stored per-user (`UserDeviceTokens` table). FCM is not deferred to v2 because a Telehealth app without background call alerts is not viable.
 - **Consultant TimeZoneId at Registration:** ✅ Finalized — `POST /auth/register` does **not** include `timeZoneId` (role-agnostic endpoint). `ConsultantProfile` is created with `TimeZoneId = null`. The consultant must set it via `PUT /consultants/me` before setting availability (`PUT /consultants/me/availability` returns `409` if null). This keeps registration simple while enforcing that availability is never computed without a timezone.
 - **Patient Health Data Model:** ✅ Finalized — `HealthProfile` is a structured Value Object (not a `string`). Contains: `HeightCm`, `WeightKg`, `BloodType` (enum), `SmokingStatus` (enum), `Allergies`/`ChronicConditions`/`CurrentMedications` (JSON lists). Stored as an owned entity / JSON column in SQL Server. This enables validation, querying, structured AI context, and clean UI rendering. A `string` field was rejected as an anti-pattern for medical data.
 - **Refund Flow (v1):** ✅ Finalized — automatic full refund for cancellations >24h before appointment via Stripe API + webhook confirmation. `Payment.RefundStatus` tracks lifecycle. Cancellations <24h are not refunded. Earnings endpoint excludes refunded payments.
@@ -629,12 +843,12 @@ None outstanding for v1 at this stage. Revisit if new architectural decisions co
 
 **Core:**
 - Users *(+ `EmailConfirmed`, `EmailVerificationTokenHash`, `EmailVerificationSentAt`)*
-- ConsultantProfiles *(+ `TimeZoneId`, `IsVerified`, `ProfileImageUrl`)*
+- ConsultantProfiles *(+ `TimeZoneId`, `IsVerified`, `ProfileImageUrl`, `Country` — required at profile completion; determines which `IPaymentProvider` routes this consultant's payments, see Section 3.3.1; + `StripeConnectAccountId`, `StripeOnboardingComplete` — Stripe path only, see Section 3.3.3)*
 - PatientProfiles *(+ `HealthProfile` value object: `HeightCm`, `WeightKg`, `BloodType`, `SmokingStatus`, `Allergies` [JSON], `ChronicConditions` [JSON], `CurrentMedications` [JSON]) — replaces v17 `HealthInfo` string*
 - AvailabilitySlots
 - Appointments *(+ `CancellationReason`, `CancelledAt`, `IdempotencyKey` UNIQUE — see booking idempotency note in Section 3.2)*
 - Consultations
-- Payments *(+ `IdempotencyKey`, `StripeRefundId`, `RefundStatus` [None/Pending/Succeeded/Failed], `RefundedAt`; `StripeClientSecret` deliberately NOT persisted — see Section 3.3)*
+- Payments *(+ `IdempotencyKey`, `Provider` [Stripe/Regional] — determines which payout path applies, `ProviderFee`, `NetAmount` — actual fee reported by the provider's balance-transaction data, not an estimated percentage, see Section 3.3.4, `StripeRefundId`, `RefundStatus` [None/Pending/Succeeded/Failed], `RefundedAt`; `StripeClientSecret` deliberately NOT persisted — see Section 3.3)*
 - ChatMessages *(+ `MessageType`, encrypted `Content`)*
 - AISummaries *(`ConsultationId` UNIQUE — backstops the `0..1` cardinality against a retry-after-partial-failure race)*
 - AIJobs *(status, retries, provider, prompt version, errors, + `ProcessingStartedAt`, `ErrorDetails`)*
@@ -643,6 +857,8 @@ None outstanding for v1 at this stage. Revisit if new architectural decisions co
 - StripeWebhookEvents *(`StripeEventId` UNIQUE — makes webhook idempotency concrete, see Section 3.3)*
 - PasswordResetTokens *(+ `TokenHash` UK, `IsUsed`, `UsedAt`, `RequestIpAddress`, `UserAgent` — same hash-only pattern as RefreshTokens)*
 - FailedLoginAttempts *(audit-only table for forensic analysis; lockout logic handled by ASP.NET Core Identity)*
+- UserDeviceTokens *(FCM push tokens — `Token` UK, `Platform`, `LastUsedAt`; see Section 3.6)*
+- PayoutLedgerEntries *(new, v1.5 — tracks amounts owed to consultants on the Regional payment path, since there's no automatic Stripe-style transfer to reconcile against; fields: `ConsultantId`, `PaymentId`, `AmountOwed`, `Currency`, `Status` [Pending/Paid/Refunded — `Refunded` set if the underlying Payment is refunded before settlement, keeping the row as an audit record rather than deleting it], `SettledAt`, `SettledByAdminUserId` — see Section 3.3.1/3.3.2)*
 
 **Deferred to v2 (do not model yet):**
 - MedicalRecords
@@ -679,6 +895,30 @@ None outstanding for v1 at this stage. Revisit if new architectural decisions co
             backplane if
             scaled later)
 ```
+
+---
+
+## 11a. Load Testing (K6)
+
+> Added because the concurrency guarantees this whole document relies on (Section 3.2's filtered unique indexes, the webhook atomic-INSERT dedup, the AIJob atomic claim) are **design-time claims until something actually tries to break them under load**. A test suite that only exercises the happy path at low volume never proves any of that.
+
+```
+k6-tests/
+├── scenarios/
+│   ├── booking-flow.js         — full happy-path: search → book → pay
+│   ├── concurrent-booking.js   — the important one: N patients hitting
+│   │                              POST /appointments for the SAME slot
+│   │                              simultaneously; expects exactly 1
+│   │                              success and N-1 clean 409s, never 2 bookings
+│   └── webhook-idempotency.js  — fires the same Stripe webhook payload
+│                                  twice in parallel; expects exactly 1
+│                                  Payment.Status=Paid transition, not 2
+├── config/
+│   └── thresholds.js           — p95 < 500ms, error rate < 1%
+└── README.md
+```
+
+**`concurrent-booking.js` is the load test that actually matters most** — it's the only way to verify the filtered unique index (Section 3.2) holds under real concurrent writes rather than just being correct on paper. `webhook-idempotency.js` does the equivalent for the atomic-INSERT dedup pattern (Sequence Diagrams, Diagram 1). Both are regression tests for specific, previously-identified race conditions in this document — not generic load tests.
 
 ---
 

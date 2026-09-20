@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TelehealthPlatform.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+eb2550b00b3bf44eeee3d36f3d96d272cdc573f9")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d72ebd818102ccbbcb32a5b617cb797587742d0c")]
 [assembly: System.Reflection.AssemblyProductAttribute("TelehealthPlatform.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TelehealthPlatform.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

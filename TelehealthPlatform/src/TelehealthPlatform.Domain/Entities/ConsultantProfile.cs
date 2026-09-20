@@ -12,7 +12,8 @@ public class ConsultantProfile : Entity
 
     public User User { get; private set; } = default!;
     public ICollection<AvailabilitySlot> AvailabilitySlots { get; private set; } = new List<AvailabilitySlot>();
-
+    public string? StripeConnectAccountId { get; private set; }
+    public bool StripeOnboardingComplete { get; private set; }
     private ConsultantProfile() { }
 
     public static ConsultantProfile CreateEmpty(Guid userId)
@@ -44,5 +45,15 @@ public class ConsultantProfile : Entity
     {
         if (TimeZoneId is null)
             throw new InvalidOperationException("TimeZoneId must be set before managing availability.");
+    }
+
+    public void AttachStripeConnectAccount(string accountId)
+    {
+        StripeConnectAccountId = accountId;
+    }
+
+    public void MarkStripeOnboardingComplete()
+    {
+        StripeOnboardingComplete = true;
     }
 }

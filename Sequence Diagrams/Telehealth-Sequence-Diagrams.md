@@ -2,7 +2,7 @@
 
 **System Design Series · Document 3 of 4** (ERD → Architecture → **Sequence Diagrams** → API Contract)
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
-**Status:** v8 — aligned with Requirements Document v19. Added No-Show Detection sequence diagram (background job, fault attribution, late-join protection).. Added Cancellation + Refund Flow sequence diagram.. Added Native SDK Layer sequence diagram (Platform Channel communication for WebRTC + Secure Storage). and Security Deep-Dive Document 5. Added Auth/Security sequence diagrams (Forgot/Reset Password, Email Verification, Refresh Token Rotation & Reuse Detection).
+**Status:** v11 — Diagram 8 (Cancellation + Refund Flow) now shows the Regional-path divergence explicitly: `PayoutLedgerEntry` status is cancelled (`Refunded`) alongside the payment refund, in the same transaction, with the already-settled (`Paid`) case flagged for manual reconciliation rather than auto-resolved. Aligned with README v19 / ERD v1.6.
 
 ---
 
@@ -13,6 +13,8 @@ A Sequence Diagram isn't needed for every endpoint — only for flows with real 
 1. **Booking → Payment → Confirmation** — transaction boundaries, concurrency, idempotency
 2. **WebRTC Call Establishment** — signaling vs. media, STUN/TURN fallback
 3. **Consultation → AI Summary** — async processing, retry, failure handling
+
+> **⚠️ Scoping note on the payment-related diagrams below:** README v19 introduced an `IPaymentProvider` abstraction — Stripe Connect for consultants in Stripe-supported countries, a Regional gateway (Paymob/PayTabs) + manual payout ledger for consultants in unsupported countries like Egypt. Rewriting every diagram below in provider-agnostic terms would blur the concrete details that make them useful (exact webhook event names, exact atomicity mechanics), so **the diagrams keep Stripe as the worked example** — the pattern (verify → atomic webhook dedup → single transaction → notify after commit) applies identically to the Regional provider, just with that provider's own webhook payload/event names substituted in. The two paths only *genuinely* diverge at payout time, not at payment collection/confirmation time — see the note immediately after Diagram 1, and the new Diagram 8 (Regional Payout Settlement) for the part that has no Stripe equivalent at all.
 4. **Forgot / Reset Password** — anti-enumeration, token security, session invalidation
 5. **Email Verification** — registration flow, verification gate
 6. **Refresh Token Rotation & Reuse Detection** — rotation, family binding, theft detection
@@ -86,6 +88,8 @@ sequenceDiagram
 - **`StripeClientSecret` is never persisted** — returned to Flutter at creation time only, consistent with the Requirements Document decision (no v1 use case needs the backend to retrieve it later).
 - **Retrieval on retry is required and must be documented in the API Contract.** Because `StripeClientSecret` is not stored, the retry path with an existing `PaymentIntentId` must retrieve the `PaymentIntent` from Stripe (`GET /v1/payment_intents/{id}`) to extract the `ClientSecret` before returning it to Flutter. This is a single, safe call — the PaymentIntent was created by this same backend.
 - **Field naming is `ScheduledStartUtc` everywhere**, and the booking constraints are *filtered* unique indexes (`WHERE Status NOT IN (Cancelled, NoShow, PaymentFailed)`) so a cancelled appointment never permanently blocks a slot from being rebooked.
+
+> **⚠️ Where the Regional path (Egypt/etc.) actually diverges from the diagram above:** everything through "`Appointment.Status = Confirmed`, `Create Notification`, `SignalR: appointment confirmed`" happens identically — same atomicity, same idempotency, same webhook-trust rule, just with the Regional gateway's own event name instead of `payment_intent.succeeded`. The divergence starts **after** confirmation, at payout: instead of the money accumulating in a Stripe Connect balance for automatic weekly transfer, confirming the payment also creates a `PayoutLedgerEntry` (`Status = Pending`) for that consultant, in the original `Payment.Currency` (never converted to USD — README §3.3.1). That entry sits pending until an admin settles it manually (see Diagram 8, added below Diagram 7).
 
 ---
 
@@ -485,6 +489,8 @@ sequenceDiagram
 
 This diagram covers both patient-initiated and consultant-initiated cancellations. The refund rule is identical for both: full automatic refund if cancelled more than 24 hours before the scheduled time; no refund if within 24 hours.
 
+> **⚠️ Provider branching applies here too** — the diagram below shows the Stripe path concretely (same scoping rationale as Diagram 1). On the **Regional path**, everything is identical through "refund initiated," except the refund call goes to the regional gateway's API instead of `POST /v1/refunds`, and there is an additional step the Stripe path doesn't need: **cancelling the associated `PayoutLedgerEntry`**, since that path has no Stripe balance to simply not-transfer — it has an explicit row saying "this consultant is owed money" that must be reversed.
+
 ```mermaid
 sequenceDiagram
     participant U as User (Patient or Consultant)
@@ -509,14 +515,15 @@ sequenceDiagram
         API-->>P: SignalR: appointment cancelled
     else More than 24h before ScheduledStartUtc
         API->>ST: POST /v1/refunds { payment_intent: pi_xxx }
-        alt Stripe refund creation fails
+        Note over API,ST: Regional path: same call shape,<br/>regional gateway's refund API instead
+        alt Refund creation fails
             ST-->>API: Error
             API->>DB: BEGIN TRANSACTION
             API->>DB: UPDATE Appointment.Status = Cancelled
             API->>DB: UPDATE Payment.RefundStatus = Failed
             API->>DB: COMMIT
             API-->>U: 200 OK { status: Cancelled, refund: { status: Failed }, message: "Refund failed. Contact support." }
-        else Stripe refund created
+        else Refund created
             ST-->>API: Refund object (re_xxx)
             API->>DB: BEGIN TRANSACTION
             API->>DB: UPDATE Appointment.Status = Cancelled
@@ -524,13 +531,23 @@ sequenceDiagram
             API->>DB: UPDATE Appointment.CancelledAt = Now
             API->>DB: UPDATE Payment.StripeRefundId = re_xxx
             API->>DB: UPDATE Payment.RefundStatus = Pending
+            opt Payment.Provider == Regional
+                API->>DB: SELECT PayoutLedgerEntry WHERE PaymentId = Payment.Id
+                alt Ledger entry Status == Pending
+                    API->>DB: UPDATE PayoutLedgerEntry.Status = Refunded
+                    Note right of DB: Row kept, not deleted — audit trail
+                else Ledger entry Status == Paid
+                    API->>DB: Flag for manual admin reconciliation
+                    Note right of DB: Clawback scenario — consultant already<br/>received money for a now-refunded appointment.<br/>Not auto-resolved (see ERD PayoutLedgerEntries note).
+                end
+            end
             API->>DB: COMMIT
             API-->>U: 200 OK { status: Cancelled, refund: { status: Pending }, message: "Refund initiated" }
             API-->>P: SignalR: appointment cancelled
         end
     end
 
-    Note over ST,API: Later: Stripe webhook charge.refunded
+    Note over ST,API: Later (Stripe path): Stripe webhook charge.refunded<br/>Regional path: regional gateway's equivalent webhook
     ST->>API: Webhook: charge.refunded
     API->>API: Verify signature + deduplicate (same atomic INSERT pattern)
     API->>DB: BEGIN TRANSACTION
@@ -544,10 +561,12 @@ sequenceDiagram
 ### What this flow locks in
 
 - **Same refund rule for both parties** — patient or consultant, the 24h rule is identical. This keeps the policy simple and fair.
-- **Refund is synchronous initiation, asynchronous confirmation** — the API calls Stripe immediately during cancellation, but the actual money movement is confirmed later via webhook (same atomic pattern as payment confirmation).
-- **Transaction boundary** — `Appointment.Status = Cancelled` + `Payment.RefundStatus = Pending` + `StripeRefundId` are committed together. A crash can't leave the appointment cancelled with no refund record.
-- **Failed refund handling** — if Stripe refund creation fails (rare), `RefundStatus = Failed` is recorded and the user is informed. Manual support intervention is needed (acceptable for v1).
-- **Earnings impact** — `GET /consultants/me/earnings` excludes `RefundStatus = Succeeded` payments, so refunded appointments never count as income.
+- **Refund is synchronous initiation, asynchronous confirmation** — the API calls the provider immediately during cancellation, but the actual money movement is confirmed later via webhook (same atomic pattern as payment confirmation).
+- **Transaction boundary** — `Appointment.Status = Cancelled` + `Payment.RefundStatus = Pending` + `StripeRefundId` + (on the Regional path) the `PayoutLedgerEntry` status change are all committed together. A crash can't leave the appointment cancelled with no refund record, or a refunded payment with a `PayoutLedgerEntry` still sitting `Pending` as if the consultant were still owed that money.
+- **The ledger and the refund state can never legitimately disagree** — the `opt Payment.Provider == Regional` block is what enforces this (README §3.3.1's warning about the ledger/refund state never conflicting).
+- **The `Paid`-entry case is deliberately not auto-resolved** — if a `PayoutLedgerEntry` was already settled before the refund arrived, that means real money already moved to the consultant for an appointment that's now refunded. The system flags this for manual reconciliation rather than guessing at a clawback mechanism.
+- **Failed refund handling** — if refund creation fails (rare), `RefundStatus = Failed` is recorded and the user is informed. Manual support intervention is needed (acceptable for v1).
+- **Earnings impact** — `GET /consultants/me/earnings` excludes `RefundStatus = Succeeded` payments, so refunded appointments never count as income, on either path.
 - **Notification to both parties** — whoever cancels, the other participant receives a SignalR notification + in-app notification.
 
 
@@ -670,3 +689,121 @@ sequenceDiagram
 - **Background job is idempotent** — if the job runs twice on the same appointment (e.g., server restart), the second run finds `Status = NoShow` and skips it. No double-processing.
 - **No manual intervention** — the entire flow is automatic from detection to refund (for consultant no-show).
 - **Mutual no-show is deterministic** — never leaves the appointment in an ambiguous state. The background job commits `MutualNoShow` + no refund immediately. There is no "null return" or "pending decision" state.
+
+
+---
+
+## 10. Push Notification Delivery — Dual Channel (SignalR + FCM)
+
+This diagram shows how the backend delivers notifications through both channels independently. The user receives the notification via whichever channel reaches them first.
+
+### 10.1 Appointment Confirmed — Dual Channel Delivery
+
+```mermaid
+sequenceDiagram
+    participant API as ASP.NET Core API
+    participant DB as SQL Server
+    participant SE as SignalR Hub
+    participant FC as FCM Service
+    participant F as Flutter (Foreground)
+    participant NA as Native Layer (Background)
+
+    Note over API: Stripe webhook confirms payment
+    API->>DB: BEGIN TRANSACTION
+    API->>DB: INSERT Notification (AppointmentConfirmed)
+    API->>DB: UPDATE Appointment.Status = Confirmed
+    API->>DB: COMMIT
+
+    par SignalR (in-app, real-time)
+        API->>SE: SendAsync("AppointmentConfirmed", { appointmentId })
+        SE->>F: Event received (app is open)
+        F->>F: Show in-app notification badge
+    and FCM (background/closed app)
+        API->>FC: SendToTokens(userId, { title, body, data })
+        alt App is open
+            FC->>F: onMessage received
+            F->>F: Show local notification (redundant but harmless)
+        else App is backgrounded
+            FC->>NA: Push received (native layer)
+            NA->>NA: Show system notification
+            NA->>NA: Play sound + vibration
+        else App is killed
+            FC->>NA: Push received (native layer wakes app)
+            NA->>NA: Show system notification
+            Note over NA: User taps notification → app launches → Flutter routes to appointment screen
+        end
+    end
+```
+
+### 10.2 Incoming Call — FCM Critical Path
+
+```mermaid
+sequenceDiagram
+    participant C as Consultant
+    participant Hub as SignalR Hub
+    participant API as ASP.NET Core API
+    participant DB as SQL Server
+    participant FC as FCM Service
+    participant NA as Native Layer (iOS/Android)
+    participant OS as CallKit / ConnectionService
+    participant P as Patient
+
+    C->>Hub: JoinCall(appointmentId)
+    Hub->>API: Validate + transition to InProgress
+    API->>DB: UPDATE Appointment.Status = InProgress
+    API->>DB: INSERT Notification (DoctorJoined)
+    API->>DB: COMMIT
+
+    Hub->>P: SignalR: IncomingCall (if connected)
+    Note over Hub,P: If app is open → instant
+
+    API->>FC: SendToTokens(patientUserId, {<br/>  type: "incoming_call",<br/>  appointmentId: "...",<br/>  consultantName: "Dr. Ahmed"<br/>})
+
+    alt App is open
+        FC->>P: onMessage (Flutter)
+        P->>P: Show incoming call UI (in-app)
+    else App is backgrounded or killed
+        FC->>NA: Push received
+        NA->>OS: Report incoming call
+        OS->>OS: Show system call UI (full screen)
+        OS-->>NA: User tapped "Answer"
+        NA->>NA: Launch app (if killed)
+        NA->>P: Route to call screen
+        P->>Hub: JoinCall(appointmentId)
+    end
+```
+
+### 10.3 Device Token Registration
+
+```mermaid
+sequenceDiagram
+    participant F as Flutter
+    participant FM as Firebase Messaging
+    participant API as ASP.NET Core API
+    participant DB as SQL Server
+
+    F->>FM: getToken()
+    FM-->>F: fcm_token_xyz
+    F->>API: POST /notifications/device-token { token: "fcm_token_xyz", platform: "android" }
+    API->>DB: SELECT existing token?
+    alt Token exists for this user
+        API->>DB: UPDATE LastUsedAt = Now
+    else New token
+        API->>DB: INSERT UserDeviceToken
+    end
+    API-->>F: 204 No Content
+
+    Note over FM,API: Later: token refreshed
+    FM-->>F: onTokenRefresh(new_token)
+    F->>API: POST /notifications/device-token { token: "new_token", platform: "android" }
+    API->>DB: REPLACE old token with new one
+    API-->>F: 204 No Content
+```
+
+### What this flow locks in
+
+- **Dual-channel is not fallback — it's parallel.** Both SignalR and FCM fire simultaneously. The user gets the notification via whichever channel their current app state supports.
+- **FCM is the only channel that works when the app is killed.** This is why it's non-negotiable for Telehealth.
+- **Incoming call is the critical path.** Without FCM + CallKit/ConnectionService, a patient with the app killed would completely miss a call — unacceptable.
+- **Token lifecycle:** Register on first launch, refresh on `onTokenRefresh`, delete on logout. Stale tokens are cleaned up periodically.
+- **Payload structure:** FCM messages include `type` and `appointmentId` so the native layer can route correctly without backend calls.

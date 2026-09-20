@@ -2,17 +2,18 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace TelehealthPlatform.Domain.Enums
+namespace TelehealthPlatform.Domain.Enums;
+
+/// <summary>
+/// Patient/Consultant are set at self-registration and immutable
+/// (Requirements §3.1 — XOR rule). Admin is NEVER self-registered — it's
+/// provisioned directly in the database (README §3.3.2) and is explicitly
+/// exempt from the XOR profile-creation rule: an Admin has neither a
+/// ConsultantProfile nor a PatientProfile, by design.
+/// </summary>
+public enum UserRole
 {
-    /// <summary>
-    /// Set once at registration and treated as immutable (Requirements Document,
-    /// Section 3.1). This is what enforces "a User is a Patient XOR a Consultant,
-    /// never both" at the application layer — command handlers that create a
-    /// ConsultantProfile/PatientProfile must check this before proceeding.
-    /// </summary>
-    public enum UserRole
-    {
-        Patient,
-        Consultant
-    }
+    Patient,
+    Consultant,
+    Admin
 }
