@@ -1,6 +1,6 @@
 # AI Telehealth Platform — Architecture Diagram (Detailed Reference)
 
-**System Design Series · Document 2 of 5** (ERD → **Architecture** → Sequence Diagrams → API Contract → Security Deep-Dive)<br>**Updated:** Added scoped offline caching for the "My Appointments" screen (Hive, cache-aside, display-only — never used for actions like Join Call/Cancel); Replaced Stripe-only payments with `IPaymentProvider` abstraction (Stripe/Regional, per consultant country); Admin Dashboard elevated to v1.5 (Angular)
+**System Design Series · Document 2 of 5** (ERD → **Architecture** → Sequence Diagrams → API Contract → Security Deep-Dive)<br>**Updated:** Added Section 4.5 (Module Communication) — enforces the Modular Monolith via separate per-module projects (not just folders), locks in `Send()` vs `Publish()` convention (direct-call semantics for anything requiring consistency, events only for genuinely-losable side effects), reaffirms no message broker inside the monolith, and documents the microservice-extraction path; added scoped offline caching for the "My Appointments" screen (Hive, cache-aside, display-only — never used for actions like Join Call/Cancel); Replaced Stripe-only payments with `IPaymentProvider` abstraction (Stripe/Regional, per consultant country); Admin Dashboard elevated to v1.5 (Angular)
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC)
 
 ![Architecture Diagram](./architecture-diagram.png)
@@ -152,6 +152,26 @@ ASP.NET Core
 ```
 
 This is what's meant by a **Modular Monolith**: one deployable application, but internally organized as clearly separated modules — giving most of the maintainability benefits of microservices without the operational overhead of running and coordinating several separate services. That overhead is explicitly not worth taking on for this project (see Section 15).
+
+---
+
+## 4.5. Module Communication — Enforcement, Not Just a Folder Structure
+
+The folder layout above is necessary but not sufficient for a real Modular Monolith — a set of folders inside one project doesn't stop one module's handler from directly querying another module's `DbSet` or repository, which quietly turns "modular" into "grouped" (all the coupling risk of a plain monolith, none of the enforced boundaries). Three concrete rules close that gap:
+
+**1. Enforcement is structural, not a convention to remember.** Each module (`Auth`, `Appointments`, `Payments`, `Chat`, `Notifications`, `AI`) is its own C# class library project, referencing only `Domain` and a shared `Contracts` project — never another module's project directly. A module that needs something from another module depends on that module's public interface (exposed via `Contracts`), never its internals. The compiler enforces this, not code review discipline. This is deliberately the same shape a future microservice extraction would need — turning one module into a standalone service later is a matter of giving it its own process and a network boundary, not restructuring its internals from scratch.
+
+**2. Cross-module calls use MediatR `Send()`, not `Publish()`, for anything that must be consistent.** MediatR offers two distinct mechanisms that are easy to conflate:
+- **`Send()` (`IRequest`)** — exactly one handler, executed synchronously, awaited by the caller, failure propagates back to the caller. This is a direct call in spirit — the mediator just avoids a hard project reference to the concrete handler.
+- **`Publish()` (`INotification`)** — zero-to-many handlers, fire-and-forget by default, and **without an Outbox Pattern, a published event is lost if the process crashes between commit and dispatch.**
+
+  This project already made this exact call once, before naming it as a general rule: `AIJob` creation is transactional (created in the same DB transaction as `CompleteConsultation`), not event-published, precisely because an event-based approach only pays off with an Outbox Pattern — explicitly out of scope for v1 (Requirements Document, Section 3.5). The same reasoning generalizes:
+  - **Use `Send()`** for any cross-module effect that must happen — e.g., `Payment confirmed → CreateNotificationCommand`. This keeps the decoupling benefit (the Payments module doesn't reference the Notifications module's concrete handler class) without losing transactional safety.
+  - **Reserve `Publish()`** for effects where occasional loss is genuinely acceptable (e.g., analytics/telemetry events) — never for anything the system's correctness depends on, unless an Outbox Pattern is added first (a deliberate v2 decision, not a default).
+
+**3. No message broker inside the monolith.** A broker (RabbitMQ, Azure Service Bus) solves communication *between separate processes* — inside one process, in-process `Send()`/`Publish()` is faster, simpler, and has nothing left to gain from a broker's guarantees. This is the same reasoning already documented in Section 20 ("Message Queue — A Future Evolution Path, Not a v1 Component") — restated here specifically to rule out the version of this idea that sounds appealing at first ("just use a broker for inter-module messages even though it's all one process") but adds real operational cost (running the broker, handling its connection failures, serializing messages) for zero benefit while everything still lives in a single deployable.
+
+**Migration path, if a module is ever extracted into a real microservice:** because module boundaries are already project-level and communication already goes through defined interfaces rather than ambient access to another module's data, extraction is: give the module its own process, replace its in-process `Send()` calls from other modules with an HTTP/gRPC client (or, at that point, a message broker becomes genuinely justified), and give it its own database schema if it doesn't already have one. The Modular Monolith is deliberately structured so this is an extraction, not a rewrite — but it is also deliberately **not** done preemptively: this project follows "monolith first," splitting out a service only once a specific module proves it needs independent scaling or a separate team boundary, not on a schedule (see Section 15, "What This Diagram Deliberately Leaves Out," for the same reasoning applied to Kubernetes/microservices generally).
 
 ---
 

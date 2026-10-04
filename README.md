@@ -2,7 +2,7 @@
 
 **Stack:** ASP.NET Core 10 (Clean Architecture, CQRS/MediatR) + Flutter (Clean Architecture, BLoC) + Native SDK Layer (Kotlin/Android, Swift/iOS via Platform Channels)
 **Owner:** Marwan
-**Status:** Draft v21 — added a deferred v2 note on app version gating / staged rollout strategy (Play/App Store + Shorebird), scoped to activate only if a concrete operational need arises; fixed a stale duplicate "Push notifications (FCM)" entry left in the Later (v2+) list after FCM was already moved to v1 in the Out of Scope section.
+**Status:** Draft v22 — resolved the consultation-overrun gap (Soft Delay + Notification, not a hard cutoff or hidden schedule buffer; max-wait-before-reschedule threshold left as an explicit open question); documented that Stripe does not refund its original processing fee (platform absorbs it — a margin consideration, not a code change); added a deferred v2 note on Serverless/Timer-Trigger migration for the stateless scheduled jobs specifically, distinct from AI/webhook processing which stay in the monolith.
 
 ---
 
@@ -307,6 +307,7 @@ Pending Payout = Net Earnings − Amount already paid out (Stripe transfer OR co
 **Refunds affect both parties:**
 - When a refund is issued (cancellation >24h or consultant no-show), the **full amount** is refunded to the patient — via Stripe's refund API on the Stripe path, or via the regional gateway's refund mechanism (or, if unsupported by that gateway, a manual reversal — this depends on which regional provider is chosen and must be verified against Paymob/PayTabs's actual refund capabilities before implementation).
 - The platform absorbs the loss (does not claw back from consultant for patient no-show; does not pay consultant for consultant no-show).
+- **Confirmed: Stripe does not return the original processing fee when a refund is issued** — the patient gets back the full amount they paid, but the platform permanently loses the `ProviderFee` it was charged at the time of the original payment (not charged a second time for the refund itself on standard card refunds, but never recovered either). No code change follows from this — `Payment.ProviderFee` already records the fee at charge time and nothing in the refund flow attempts to claw it back — but it's a real, recurring cost to the platform's margin on every refunded appointment, worth factoring into the 80/20 split's actual profitability, not just a technical footnote.
 - On the regional path, a refunded appointment must **not** have created (or must reverse) a `PayoutLedgerEntry` — the ledger and the refund state must never disagree about whether a consultant is owed money for that appointment.
 - `GET /consultants/me/earnings` excludes refunded appointments entirely, regardless of provider.
 
@@ -581,7 +582,7 @@ The **architecture** supports both chat-based and voice-based context from day o
 
 ### 3.6 Notifications *(v1: SignalR + FCM Push)*
 - As a Patient/Consultant, I want to receive in-app notifications for key events, so that I stay informed without checking manually.
-- Events to cover in v1: Appointment booked, Appointment confirmed, Appointment cancelled, Appointment starting soon, Doctor joined consultation.
+- Events to cover in v1: Appointment booked, Appointment confirmed, Appointment cancelled, Appointment starting soon, Doctor joined consultation, Consultant running behind (Section 4's soft-delay rule), Consultant ready (fires when the prior consultation completes and the waiting patient can now join).
 - As a system, I want to deliver in-app notifications via **SignalR** when the app is open, so that real-time updates are instant.
 - As a system, I want to deliver **push notifications via FCM** when the app is in the background or closed, so that critical events (incoming call, appointment reminder, booking confirmation) are never missed.
 - As a Patient/Consultant, I want to see which notifications are unread, so that I can tell what's new.
@@ -607,6 +608,18 @@ Appointment (1:1) Consultation
 ```
 
 This separation keeps WebRTC session data, chat history, and AI summaries cleanly attached to the *session*, distinct from the *booking* record.
+
+> **⚠️ Consultation overrun — a real gap, now resolved (not previously addressed anywhere in this document).** A 30-minute `Appointment` slot does not guarantee a 30-minute `Consultation` — a real medical conversation can run long. **Decision: Soft Delay + Notification, not a hard cutoff.** Auto-disconnecting a live medical consultation mid-conversation to protect the schedule is an ethical/product risk not worth taking; a hidden schedule buffer (padding every 30-min slot to 35–40 min internally) reduces consultant availability for no guaranteed benefit. Instead:
+> ```
+> Next patient's JoinCall arrives at their ScheduledStartUtc
+>         ↓
+> Is the consultant still InProgress in a prior Consultation?
+>    ├── No  → normal join
+>    └── Yes → Notification: "Your consultant is running behind — you'll be connected shortly"
+>              Patient enters a waiting state (no error, no forced disconnect)
+>              When the prior Consultation.Complete() fires → immediate Notification: "Your consultant is ready"
+> ```
+> **Open question — not yet decided:** what happens if the delay exceeds a threshold (e.g., 15 minutes)? A reasonable v1 candidate is offering an automatic reschedule that does **not** count against the patient's booking history the way a normal cancellation would (the delay isn't the patient's fault) — but the exact threshold and reschedule mechanics need a deliberate decision before implementation, not a default.
 
 ---
 
@@ -668,6 +681,7 @@ This separation keeps WebRTC session data, chat history, and AI summaries cleanl
 - Redis SignalR backplane (only if scaling beyond one instance)
 - Richer `RefreshToken` fields for multi-device session management (`DeviceId`, `UserAgent`, `IpAddress`, `RevokedReason`)
 - App version gating / staged rollout strategy (Play Store staged rollout, App Store phased release, Shorebird tracks for Dart hotfixes) — deferred until a concrete operational need arises (e.g. a critical WebRTC bug requiring forced update for affected client versions)
+- Serverless migration for the stateless scheduled jobs specifically (No-show detection, Pending Payment expiry, Stale device token cleanup) — these are the one piece of the system that fits a Timer Trigger function naturally (Azure Functions/AWS Lambda), unlike AI processing or webhook handling, which stay inside the monolith by design (Architecture Document, Section 4.5) since splitting them out would reintroduce the exact Message Broker/transaction-boundary complexity already rejected for v1. A plain `HostedService` inside the monolith is sufficient at current scale — this is a future option, not a v1 gap.
 
 ---
 
