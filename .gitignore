@@ -1,3 +1,38 @@
 *.docx
 *.html
 Telehealth-Stitch-Design-Context.md
+
+# macOS
+.DS_Store
+
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+
+# Flutter IDE
+.idea/
+*.iml
+
+# iOS
+Pods/
+DerivedData/
+*.xcuserstate
+
+# Android
+.gradle/
+local.properties
+.cxx/
+
+# .NET / Visual Studio
+.vs/
+bin/
+obj/
+
+# Coverage / generated
+coverage/
+
