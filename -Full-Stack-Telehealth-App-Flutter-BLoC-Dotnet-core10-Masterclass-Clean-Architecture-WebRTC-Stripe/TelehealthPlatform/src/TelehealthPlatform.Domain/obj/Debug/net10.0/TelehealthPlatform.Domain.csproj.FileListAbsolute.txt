@@ -1,0 +1,24 @@
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\bin\Debug\net10.0\TelehealthPlatform.Domain.deps.json
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\bin\Debug\net10.0\TelehealthPlatform.Domain.dll
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\bin\Debug\net10.0\TelehealthPlatform.Domain.pdb
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.GeneratedMSBuildEditorConfig.editorconfig
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.AssemblyInfoInputs.cache
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.AssemblyInfo.cs
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.csproj.CoreCompileInputs.cache
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.sourcelink.json
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.dll
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\refint\TelehealthPlatform.Domain.dll
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.pdb
+D:\Full-Stack Telehealth App Flutter (BLoC) & Dotnet core10 Masterclass , Clean Architecture, WebRTC & Stripe\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\ref\TelehealthPlatform.Domain.dll
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\bin\Debug\net10.0\TelehealthPlatform.Domain.deps.json
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\bin\Debug\net10.0\TelehealthPlatform.Domain.dll
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\bin\Debug\net10.0\TelehealthPlatform.Domain.pdb
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.GeneratedMSBuildEditorConfig.editorconfig
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.AssemblyInfoInputs.cache
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.AssemblyInfo.cs
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.csproj.CoreCompileInputs.cache
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.sourcelink.json
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.dll
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\refint\TelehealthPlatform.Domain.dll
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\TelehealthPlatform.Domain.pdb
+D:\Telehealth App\TelehealthPlatform\src\TelehealthPlatform.Domain\obj\Debug\net10.0\ref\TelehealthPlatform.Domain.dll

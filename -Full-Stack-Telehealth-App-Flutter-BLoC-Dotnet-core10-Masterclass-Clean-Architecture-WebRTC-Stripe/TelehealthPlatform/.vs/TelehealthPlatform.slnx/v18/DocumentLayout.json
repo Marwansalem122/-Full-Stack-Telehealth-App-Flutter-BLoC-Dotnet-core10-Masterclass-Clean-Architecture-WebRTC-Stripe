@@ -1,0 +1,146 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\Telehealth App\\TelehealthPlatform\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\entities\\payment.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\entities\\payment.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\entities\\consultantprofile.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\entities\\consultantprofile.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\auth\\register\\registercommandhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\auth\\register\\registercommandhandler.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.application\\common\\auth\\register\\registercommandvalidator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{4121D840-78F3-8575-6968-4729369125E7}|src\\TelehealthPlatform.Application\\TelehealthPlatform.Application.csproj|solutionrelative:src\\telehealthplatform.application\\common\\auth\\register\\registercommandvalidator.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\enums\\userrole.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\enums\\userrole.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\entities\\payoutledgerentry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\entities\\payoutledgerentry.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|d:\\telehealth app\\telehealthplatform\\src\\telehealthplatform.domain\\enums\\payoutledgerstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{BAD79E9B-BF3F-DB0C-8104-7786BE38C046}|src\\TelehealthPlatform.Domain\\TelehealthPlatform.Domain.csproj|solutionrelative:src\\telehealthplatform.domain\\enums\\payoutledgerstatus.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 2,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{34e76e81-ee4a-11d0-ae2e-00a0c90fffc3}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:1:0:{d212f56b-c48a-434c-a121-1c5d80b59b9f}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Payment.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Entities\\Payment.cs",
+              "ViewState": "AgIAAD8AAACAzMzMzMwowE0AAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-15T21:37:24.824Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "ConsultantProfile.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\ConsultantProfile.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Entities\\ConsultantProfile.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\ConsultantProfile.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Entities\\ConsultantProfile.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAADkAAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-15T21:36:00.474Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "RegisterCommandHandler.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandHandler.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandHandler.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandHandler.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandHandler.cs",
+              "ViewState": "AgIAAB8AAAAAAAAAAAAgwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-15T21:35:12.703Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "RegisterCommandValidator.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandValidator.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandValidator.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandValidator.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Application\\Common\\Auth\\Register\\RegisterCommandValidator.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAABEAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-15T21:33:48.6Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "UserRole.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\UserRole.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Enums\\UserRole.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\UserRole.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Enums\\UserRole.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-15T21:32:20.814Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "PayoutLedgerEntry.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\PayoutLedgerEntry.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Entities\\PayoutLedgerEntry.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Entities\\PayoutLedgerEntry.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Entities\\PayoutLedgerEntry.cs",
+              "ViewState": "AgIAACkAAAAAAAAAAAAqwD4AAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-07T08:18:34.912Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "PayoutLedgerStatus.cs",
+              "DocumentMoniker": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\PayoutLedgerStatus.cs",
+              "RelativeDocumentMoniker": "src\\TelehealthPlatform.Domain\\Enums\\PayoutLedgerStatus.cs",
+              "ToolTip": "D:\\Telehealth App\\TelehealthPlatform\\src\\TelehealthPlatform.Domain\\Enums\\PayoutLedgerStatus.cs",
+              "RelativeToolTip": "src\\TelehealthPlatform.Domain\\Enums\\PayoutLedgerStatus.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAABAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-07T08:17:22.726Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
