@@ -1,0 +1,14 @@
+{
+    "@@locale": "en",
+  "onboardingTitle1": "Your Health, Simplified ",
+  "onboardingDescription1": "Connect with certified medical experts from the comfort of your home. Quality care is just a tap away.",
+  "onboardingTitle2": "Secure Video Calls",
+  "onboardingDescription2": "Experience seamless, private consultations with your doctors through encrypted high-definition video calls.",
+  "onboardingTitle3": "AI-Powered Insights",
+  "onboardingDescription3": "Not feeling well? Use our intelligent symptom checker for instant guidance and specialized recommendations.",
+  "onboardingTitle4": "Instant Support",
+  "onboardingDescription4": "Stay connected with your care team through secure messaging and get real-time updates on your health journey.",
+  "skip": "Skip",
+  "next": "Next",
+  "getStarted": "Get Started"
+}
